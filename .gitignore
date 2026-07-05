@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+.env
+munder_difflin.db
