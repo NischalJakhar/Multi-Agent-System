@@ -925,7 +925,11 @@ ordering_agent = ToolCallingAgent(
         "alone does NOT fulfill the customer's order). finalize_sale records the "
         "actual customer sale (a sales transaction, priced from the catalog and "
         "discount tiers) and must be called for every fulfilled line item. Can also "
-        "pull the company's cash balance and financial report."
+        "pull the company's cash balance and financial report. IMPORTANT: only ever "
+        "call place_stock_order/finalize_sale with the exact item name you were told "
+        "to act on. If that item_name is rejected as not matching the catalog, report "
+        "it back as unmatched/unfulfillable — never substitute a different, unrelated "
+        "catalog item just to force a transaction through."
     ),
 )
 
@@ -947,7 +951,12 @@ ONLY valid dates for this task.
 For every incoming customer request:
 
 1. Ask inventory_agent to match each requested item to its exact catalog name
-   and check current stock as of the request date.
+   (via get_item_catalog) and check current stock as of the request date. If
+   a requested item has no confident, unambiguous match in the catalog (e.g. a
+   compound description like "A4 glossy paper" that isn't itself a catalog
+   entry), that item is UNMATCHED — treat it exactly like insufficient stock:
+   report it to the customer as unable to be fulfilled, stating the reason.
+   NEVER substitute a different, unrelated catalog item in its place.
 2. If stock is insufficient for an item, ask inventory_agent to estimate the
    supplier delivery date for a restock (using the request date as the order
    date), and only proceed with that item if the restock would arrive by the
@@ -961,7 +970,10 @@ For every incoming customer request:
    step 2, and then — for every single item you have decided to fulfill,
    restocked or not — call finalize_sale to record the customer's sale. A
    restock alone never fulfills a customer order; only finalize_sale does.
-   Use the request date for every transaction.
+   Use the request date for every transaction. Only ever act on items that
+   were actually matched and requested — never ask ordering_agent to sell an
+   item that was not part of this customer's request, and never let it pick a
+   substitute item if a tool call fails to match the catalog.
 5. Compose a final, customer-facing response in plain text that:
    - States clearly what was fulfilled and what was not, and why (e.g.
      insufficient stock, cannot meet the requested delivery date).
