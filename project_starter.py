@@ -972,6 +972,12 @@ orchestrator_agent = CodeAgent(
     instructions=ORCHESTRATOR_INSTRUCTIONS,
     name="orchestrator_agent",
     description="Coordinates inventory, quoting, and ordering agents to process a customer request end to end.",
+    # A single orchestrator step can delegate to several managed agents, each of
+    # which makes its own LLM call, so the default 30s sandbox timeout is easily
+    # exceeded. A killed-and-retried step would re-run side-effecting tool calls
+    # (finalize_sale, place_stock_order) that had already committed to the
+    # database, duplicating transactions, so give it more headroom.
+    executor_kwargs={"timeout_seconds": 300},
 )
 
 
