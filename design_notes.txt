@@ -47,72 +47,86 @@ Decisions behind this split:
 2. Evaluation (test_results.csv)
 ----------------------------------
 All 20 requests in quote_requests_sample.csv were run in chronological order,
-tracking cash and inventory value before/after each. Starting point (as of
-2025-04-01, after seed stock purchases): cash $45,059.70, inventory $4,940.30.
-Ending point (2025-04-17): cash $49,685.31, inventory -$208.40 (the negative
-figure is itself a bug finding, discussed below).
+tracking cash and inventory value before/after each. This is the third full
+run; the first two surfaced bugs (below) that were fixed in between. Starting
+point (as of 2025-04-01, after seed stock purchases): cash $45,059.70,
+inventory $4,940.30. Ending point (2025-04-17): cash $39,301.60, inventory
+$9,780.65 (both sane and positive).
 
 Against the rubric's evaluation criteria:
 - Cash balance changed on 7 of the 20 requests (>= the 3 required).
-- 12 of the 20 responses contain at least one successfully priced/fulfilled
+- 16 of the 20 responses contain at least one successfully priced/fulfilled
   line item (>= the 3 required).
 - 16 of the 20 responses explicitly state a reason for a line item that
-  could not be fulfilled (out of stock, no catalog match, insufficient cash),
-  confirming not every request is blindly approved.
+  could not be fulfilled (out of stock, no catalog match), confirming not
+  every request is blindly approved.
 
 Strengths observed:
 - The system correctly and clearly declines items that are genuinely out of
   stock or don't exist in the catalog, and says why, in plain language, in
-  most requests (e.g. request 5: "all requested items are out of stock").
+  most requests (e.g. "all requested items are out of stock").
 - Deterministic pricing means every quoted discount is arithmetically
   correct and reproducible, independent of the LLM's own (sometimes
   garbled) restatement of the numbers.
 - Bulk orders are split across multiple line items and priced/fulfilled
   independently, so a request with 3-4 items can be partially fulfilled
   rather than all-or-nothing.
+- No negative stock and no sales of items unrelated to the actual request
+  anywhere in this run's ledger (see (b) and (c) below — both confirmed
+  fixed by this run).
 
-Limitations found by auditing the transaction ledger (not just the chat
-transcript — this is the main lesson from this evaluation: the ledger, not
-the model's narration, is the actual source of truth):
+Limitations found by auditing the transaction ledger against the raw request
+text (not just the chat transcript — this is the main lesson from this
+evaluation: the ledger, not the model's narration, is the actual source of
+truth):
 
-a) Timeout-triggered duplicate transactions. smolagents' CodeAgent has a
-   default 30-second timeout per reasoning step. A step that delegates to
-   several managed agents (each a real LLM call) can exceed that easily; the
-   killed step was retried from scratch, re-running finalize_sale/
-   place_stock_order calls that had already committed, duplicating several
-   sales in an initial run. Fixed by raising the timeout
-   (executor_kwargs={"timeout_seconds": 300}) once identified.
+a) Timeout-triggered duplicate transactions (run 1 only). smolagents'
+   CodeAgent has a default 30-second timeout per reasoning step. A step that
+   delegates to several managed agents (each a real LLM call) can exceed
+   that easily; the killed step was retried from scratch, re-running
+   finalize_sale/place_stock_order calls that had already committed,
+   duplicating several sales. Fixed by raising the timeout
+   (executor_kwargs={"timeout_seconds": 300}). Confirmed fixed: zero
+   timeout events in this run.
 
-b) No hard guard against overselling. Nothing originally stopped
-   finalize_sale from selling more units than were actually in stock. By the
-   end of the evaluation run, several items had gone negative (e.g. A4 paper
-   at -11,128 units), which is why the final inventory value above is
-   negative — the model wasn't consistently checking real stock before
-   confirming a sale. Fixed after this evaluation run by adding a check
-   inside finalize_sale that raises if the requested quantity exceeds actual
-   stock as of the sale date.
+b) No hard guard against overselling (run 1 & 2). Nothing originally
+   stopped finalize_sale from selling more units than were actually in
+   stock; by the end of run 2, several items had gone negative (e.g. A4
+   paper at -11,128 units), driving the final inventory value negative.
+   Fixed by adding a check inside finalize_sale that raises if the
+   requested quantity exceeds actual stock as of the sale date. Confirmed
+   fixed: no item has negative net stock in this run.
 
-c) Item-name substitution on ambiguous requests. Name resolution is exact
-   (case/whitespace-insensitive) match only. When a customer's wording
-   didn't correspond to any single catalog SKU (e.g. "A4 glossy paper",
-   where the catalog has separate "A4 paper" and "Glossy paper" entries but
-   no combined one), the ordering agent sometimes gave up trying to match
-   the requested item and instead sold a completely unrelated catalog item
-   (e.g. "Invitation cards") just to have something to report as fulfilled.
-   This produced a few fictitious sales unrelated to any actual request.
-   Fixed after this run by explicitly instructing the orchestrator and
-   ordering_agent to treat an unmatched name exactly like insufficient stock
-   (decline and explain) and never substitute a different item.
+c) Item-name substitution on ambiguous requests (run 1 & 2). Name
+   resolution is exact (case/whitespace-insensitive) match only. When a
+   customer's wording didn't correspond to any single catalog SKU (e.g. "A4
+   glossy paper", where the catalog has separate "A4 paper" and "Glossy
+   paper" entries but no combined one), the ordering agent sometimes gave up
+   trying to match the requested item and instead sold a completely
+   unrelated catalog item (e.g. "Invitation cards") just to have something
+   to report as fulfilled. Fixed by explicitly instructing the orchestrator
+   and ordering_agent to treat an unmatched name exactly like insufficient
+   stock (decline and explain) and never substitute a different item.
+   Confirmed fixed: every sold item in this run traces back to an actual
+   request.
 
-d) Rationale isn't always faithful to the actual system state. In one
-   response the system told a customer an item couldn't be processed due to
-   "insufficient cash balance" when the real cash balance was healthy
-   (~$45,000) — the LLM invented a plausible-sounding but false reason.
+d) Partial-batch retries duplicate already-completed sales (still present
+   in this run). When one request lists several items and some of them
+   fail to match the catalog (e.g. a request for "A4 paper", "A3 paper",
+   and "500 reams of printer paper" — the catalog has no "A3 paper" or
+   "printer paper" entries), the ordering_agent retries the whole batch
+   instead of just the failed items, re-selling the items that already
+   succeeded (e.g. "A4 paper" was sold 3 times over for that one request).
+   This doesn't corrupt correctness the way (b) and (c) did — no negative
+   stock, no unrelated items — but it does inflate cash/inventory movement
+   for a handful of items. Not yet fixed; see suggestion #2 below.
 
-Fixes (a)-(c) are committed in project_starter.py; (b) and (c) were applied
-after this evaluation run completed and have only been spot-checked, not
-re-validated against the full 20-request batch, per a deliberate choice to
-document the limitation rather than spend another full run re-verifying it.
+e) Rationale isn't always faithful to the actual system state (observed in
+   an earlier run). The system once told a customer an item couldn't be
+   processed due to "insufficient cash balance" when the real cash balance
+   was healthy (~$45,000) — the LLM invented a plausible-sounding but false
+   reason. Not code-fixable without validating output against tool results
+   (see suggestion #3 below).
 
 3. Suggestions for further improvement
 -----------------------------------------
@@ -125,9 +139,11 @@ document the limitation rather than spend another full run re-verifying it.
 
 2. Idempotent transactions. Give create_transaction an idempotency key
    (e.g. hash of item + type + date + request_id) so that any retried agent
-   step — whether from a timeout, a network error, or the model simply
-   calling a tool twice — can never double-book the same logical sale or
-   restock, independent of how well the step-timeout is tuned.
+   step — whether from a timeout, a network error, or the ordering_agent
+   retrying a whole batch after one item in it failed to match (finding d
+   above) — can never double-book the same logical sale or restock. This
+   would also let the ordering_agent be told "just retry, it's safe" instead
+   of needing per-item retry logic.
 
 3. Validate the customer-facing rationale against tool outputs before
    sending it. Add a lightweight check (rule-based or a second LLM pass)
