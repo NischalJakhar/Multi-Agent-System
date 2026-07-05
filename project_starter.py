@@ -604,6 +604,53 @@ model = OpenAIServerModel(
  and apply criteria to them to ensure that the flow of the system is correct."""
 
 
+def _resolve_item_name(item_name: str) -> str:
+    """
+    Resolve a possibly-imprecise item name to the exact catalog item_name.
+
+    Matches case-insensitively and ignoring leading/trailing whitespace so that
+    minor formatting differences from an LLM (e.g. "A4 Paper" vs "A4 paper")
+    don't silently create a mismatched, untracked inventory line.
+
+    Args:
+        item_name: The item name as supplied by an agent/tool call.
+
+    Returns:
+        The exact, canonical item_name string from paper_supplies.
+
+    Raises:
+        ValueError: If no catalog item matches item_name.
+    """
+    normalized = item_name.strip().lower()
+    for item in paper_supplies:
+        if item["item_name"].strip().lower() == normalized:
+            return item["item_name"]
+    raise ValueError(
+        f"'{item_name}' does not match any catalog item. Call get_item_catalog "
+        "to see valid item names."
+    )
+
+
+def _price_line_item(item_name: str, quantity: int) -> Dict:
+    """
+    Resolve an item and price it using the catalog unit price and bulk-discount tiers.
+
+    Args:
+        item_name: The requested item name (matched case-insensitively to the catalog).
+        quantity: Number of units.
+
+    Returns:
+        A dict with 'item_name' (canonical), 'unit_price', 'subtotal', 'discount_pct',
+        and 'total'.
+    """
+    canonical_name = _resolve_item_name(item_name)
+    unit_price = next(
+        item["unit_price"] for item in paper_supplies if item["item_name"] == canonical_name
+    )
+    pricing = calculate_bulk_price(unit_price=unit_price, quantity=quantity)
+    return {"item_name": canonical_name, "unit_price": unit_price, **pricing}
+
+
 # Tools for inventory agent
 
 @tool
@@ -612,15 +659,17 @@ def check_item_stock(item_name: str, as_of_date: str) -> Dict:
     Look up the current stock level of a single catalog item as of a given date.
 
     Args:
-        item_name: The exact catalog item name (must match a paper_supplies entry).
-        as_of_date: ISO date (YYYY-MM-DD) to evaluate stock as of.
+        item_name: The catalog item name (matched case-insensitively to the catalog).
+        as_of_date: ISO date (YYYY-MM-DD) to evaluate stock as of. Must be the
+            exact date from the customer's request, never invented or assumed.
 
     Returns:
-        A dict with 'item_name' and 'current_stock' (int).
+        A dict with 'item_name' (canonical) and 'current_stock' (int).
     """
-    stock_df = get_stock_level(item_name, as_of_date)
+    canonical_name = _resolve_item_name(item_name)
+    stock_df = get_stock_level(canonical_name, as_of_date)
     return {
-        "item_name": item_name,
+        "item_name": canonical_name,
         "current_stock": int(stock_df["current_stock"].iloc[0]),
     }
 
@@ -696,7 +745,6 @@ def get_quote_history(search_terms: List[str], limit: int = 5) -> List[Dict]:
     return search_quote_history(search_terms, limit)
 
 
-@tool
 def calculate_bulk_price(unit_price: float, quantity: int) -> Dict:
     """
     Apply a tiered bulk discount to a base unit price and quantity.
@@ -728,15 +776,39 @@ def calculate_bulk_price(unit_price: float, quantity: int) -> Dict:
     return {"subtotal": round(subtotal, 2), "discount_pct": discount_pct, "total": round(total, 2)}
 
 
+@tool
+def quote_line_item(item_name: str, quantity: int) -> Dict:
+    """
+    Price a single requested item using the catalog unit price and bulk-discount tiers.
+
+    This is the authoritative pricing calculation: it looks up the exact catalog
+    unit price itself rather than trusting a caller-supplied price, so quoted
+    prices are always consistent with what will later be charged.
+
+    Args:
+        item_name: The requested item name (matched case-insensitively to the catalog).
+        quantity: Number of units being quoted.
+
+    Returns:
+        A dict with 'item_name' (canonical), 'unit_price', 'subtotal' (pre-discount),
+        'discount_pct', and 'total' (final price).
+
+    Raises:
+        ValueError: If item_name does not match any catalog item.
+    """
+    return _price_line_item(item_name, quantity)
+
+
 quoting_agent = ToolCallingAgent(
-    tools=[get_item_catalog, get_quote_history, calculate_bulk_price],
+    tools=[get_item_catalog, get_quote_history, quote_line_item],
     model=model,
     name="quoting_agent",
     description=(
         "Prices customer requests. Looks up the item catalog to match requested items "
-        "to exact catalog names and unit prices, searches quote history for similar "
-        "past orders as reference, and applies bulk-discount pricing. Returns a "
-        "line-item price breakdown with a rationale for the price."
+        "to exact catalog names, searches quote history for similar past orders as "
+        "reference, and calls quote_line_item (which applies bulk-discount pricing "
+        "using the real catalog price) to get the authoritative price for each item. "
+        "Returns a line-item price breakdown with a rationale for the price."
     ),
 )
 
@@ -772,21 +844,30 @@ def get_financial_report(as_of_date: str) -> Dict:
 
 
 @tool
-def place_stock_order(item_name: str, quantity: int, unit_price: float, order_date: str) -> int:
+def place_stock_order(item_name: str, quantity: int, order_date: str) -> int:
     """
     Record a supplier restock order (a 'stock_orders' transaction) to increase inventory.
+    This is an internal supply-chain action; it does not by itself fulfill a
+    customer's order (see finalize_sale for that).
 
     Args:
-        item_name: The exact catalog item name being restocked.
+        item_name: The requested item name (matched case-insensitively to the catalog).
         quantity: Number of units ordered from the supplier.
-        unit_price: The catalog unit price used to cost the restock.
-        order_date: ISO date (YYYY-MM-DD) the order is placed.
+        order_date: ISO date (YYYY-MM-DD) the order is placed. Must be the exact
+            date from the customer's request, never invented or assumed.
 
     Returns:
         The new transaction's id.
+
+    Raises:
+        ValueError: If item_name does not match any catalog item.
     """
+    canonical_name = _resolve_item_name(item_name)
+    unit_price = next(
+        item["unit_price"] for item in paper_supplies if item["item_name"] == canonical_name
+    )
     return create_transaction(
-        item_name=item_name,
+        item_name=canonical_name,
         transaction_type="stock_orders",
         quantity=quantity,
         price=round(unit_price * quantity, 2),
@@ -795,26 +876,34 @@ def place_stock_order(item_name: str, quantity: int, unit_price: float, order_da
 
 
 @tool
-def finalize_sale(item_name: str, quantity: int, total_price: float, sale_date: str) -> int:
+def finalize_sale(item_name: str, quantity: int, sale_date: str) -> Dict:
     """
     Record a completed customer sale (a 'sales' transaction) and reduce inventory.
+    The charged price is always computed from the catalog price and bulk-discount
+    tiers (the same logic quote_line_item uses), so the amount charged is
+    guaranteed to match the price quoted to the customer.
 
     Args:
-        item_name: The exact catalog item name sold.
+        item_name: The requested item name (matched case-insensitively to the catalog).
         quantity: Number of units sold.
-        total_price: The final, discounted total charged to the customer for this line item.
-        sale_date: ISO date (YYYY-MM-DD) of the sale.
+        sale_date: ISO date (YYYY-MM-DD) of the sale. Must be the exact date from
+            the customer's request, never invented or assumed.
 
     Returns:
-        The new transaction's id.
+        A dict with 'transaction_id' and the 'total' amount charged.
+
+    Raises:
+        ValueError: If item_name does not match any catalog item.
     """
-    return create_transaction(
-        item_name=item_name,
+    pricing = _price_line_item(item_name, quantity)
+    transaction_id = create_transaction(
+        item_name=pricing["item_name"],
         transaction_type="sales",
         quantity=quantity,
-        price=total_price,
+        price=pricing["total"],
         date=sale_date,
     )
+    return {"transaction_id": transaction_id, "total": pricing["total"]}
 
 
 ordering_agent = ToolCallingAgent(
@@ -823,9 +912,11 @@ ordering_agent = ToolCallingAgent(
     name="ordering_agent",
     description=(
         "Finalizes orders. Restocks items from the supplier when inventory is "
-        "insufficient (recording a stock_orders transaction), then records the "
-        "customer sale (a sales transaction) once stock and cash are confirmed "
-        "sufficient. Can also pull the company's cash balance and financial report."
+        "insufficient (place_stock_order records a stock_orders transaction; this "
+        "alone does NOT fulfill the customer's order). finalize_sale records the "
+        "actual customer sale (a sales transaction, priced from the catalog and "
+        "discount tiers) and must be called for every fulfilled line item. Can also "
+        "pull the company's cash balance and financial report."
     ),
 )
 
@@ -834,28 +925,44 @@ ordering_agent = ToolCallingAgent(
 
 ORCHESTRATOR_INSTRUCTIONS = """
 You are the order-processing orchestrator for Munder Difflin Paper Company.
-For every incoming customer request, coordinate your managed agents to:
 
-1. Ask inventory_agent to match requested items to exact catalog names and check
-   current stock as of the request date for each item.
+The customer request you are given always contains a "Date of request:
+YYYY-MM-DD" and may also mention a requested delivery date. These are the
+ONLY valid dates for this task.
+- Never invent, assume, or substitute any other date (not today's real-world
+  date, not a training-data default, not an example date) for any tool call.
+- Quote the request date and any delivery date verbatim to every managed
+  agent you delegate to, and require them to use those exact date strings in
+  every tool call that takes a date.
+
+For every incoming customer request:
+
+1. Ask inventory_agent to match each requested item to its exact catalog name
+   and check current stock as of the request date.
 2. If stock is insufficient for an item, ask inventory_agent to estimate the
-   supplier delivery date for a restock, and only proceed with that item if the
-   restock would arrive by the customer's requested delivery date. Otherwise,
-   that line item cannot be fulfilled.
-3. Ask quoting_agent to price every item that can be fulfilled, applying bulk
-   discounts and referencing quote history.
-4. Ask ordering_agent to check the cash balance, place any needed stock_orders,
-   then record a sales transaction for each fulfilled line item.
+   supplier delivery date for a restock (using the request date as the order
+   date), and only proceed with that item if the restock would arrive by the
+   customer's requested delivery date. Otherwise, that line item cannot be
+   fulfilled — do not restock or sell it.
+3. Ask quoting_agent to price every item that can be fulfilled via
+   quote_line_item (which computes the authoritative catalog + discount
+   price), referencing quote history for rationale only.
+4. Ask ordering_agent to check the cash balance, place a stock_orders
+   restock via place_stock_order for any item identified as insufficient in
+   step 2, and then — for every single item you have decided to fulfill,
+   restocked or not — call finalize_sale to record the customer's sale. A
+   restock alone never fulfills a customer order; only finalize_sale does.
+   Use the request date for every transaction.
 5. Compose a final, customer-facing response in plain text that:
    - States clearly what was fulfilled and what was not, and why (e.g.
      insufficient stock, cannot meet the requested delivery date).
    - Shows the price for each fulfilled item, including any discount applied,
      with a short rationale.
    - Never reveals internal details such as profit margins, cash balance,
-     internal database errors, or other customers' data.
+     internal database errors, or other customers' data. Do not mention the
+     company's cash balance at all in the customer-facing text.
 
-Always pass dates through explicitly to your managed agents. Return only the
-final customer-facing text as your final answer.
+Return only the final customer-facing text as your final answer.
 """
 
 orchestrator_agent = CodeAgent(

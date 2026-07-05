@@ -2,3 +2,4 @@ __pycache__/
 *.pyc
 .env
 munder_difflin.db
+run_log.txt
