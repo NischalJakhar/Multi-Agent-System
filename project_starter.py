@@ -893,9 +893,18 @@ def finalize_sale(item_name: str, quantity: int, sale_date: str) -> Dict:
         A dict with 'transaction_id' and the 'total' amount charged.
 
     Raises:
-        ValueError: If item_name does not match any catalog item.
+        ValueError: If item_name does not match any catalog item, or if quantity
+            exceeds the actual stock on hand as of sale_date (place a restock via
+            place_stock_order first).
     """
     pricing = _price_line_item(item_name, quantity)
+    available = get_stock_level(pricing["item_name"], sale_date)["current_stock"].iloc[0]
+    if quantity > available:
+        raise ValueError(
+            f"Cannot sell {quantity} units of '{pricing['item_name']}': only "
+            f"{available} in stock as of {sale_date}. Place a stock_order restock "
+            "first, or reduce the quantity."
+        )
     transaction_id = create_transaction(
         item_name=pricing["item_name"],
         transaction_type="sales",
