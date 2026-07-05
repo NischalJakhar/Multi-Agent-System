@@ -1,0 +1,137 @@
+Munder Difflin Multi-Agent System — Design Notes / Reflection
+================================================================
+
+1. Architecture
+----------------
+The system uses 4 agents (within the 5-agent limit), built with smolagents.
+See workflow_diagram.svg for the visual version of what's described below.
+
+- orchestrator_agent (CodeAgent): the only agent the "customer" talks to. It
+  never touches the database directly (it has zero tools of its own) — its
+  entire job is to delegate to the three worker agents, decide what can be
+  fulfilled, and compose the final customer-facing reply.
+
+- inventory_agent (ToolCallingAgent): checks stock and delivery feasibility.
+    check_item_stock       -> get_stock_level()
+    check_full_inventory    -> get_all_inventory()
+    estimate_delivery_date  -> get_supplier_delivery_date()
+
+- quoting_agent (ToolCallingAgent): prices requests.
+    get_item_catalog   -> paper_supplies (catalog lookup, for name matching)
+    get_quote_history  -> search_quote_history() (rationale/reference only)
+    quote_line_item    -> catalog unit price + tiered bulk discount
+
+- ordering_agent (ToolCallingAgent): commits money-affecting actions.
+    check_cash_balance    -> get_cash_balance()
+    get_financial_report  -> generate_financial_report()
+    place_stock_order     -> create_transaction() [stock_orders]
+    finalize_sale         -> create_transaction() [sales]
+
+Decisions behind this split:
+- The three worker roles map 1:1 onto the three business operations the
+  project asks for (inventory checks, quoting, order fulfillment), so
+  responsibilities don't overlap and each agent's tool list stays small and
+  auditable.
+- Pricing and charging are made deterministic on purpose: quote_line_item and
+  finalize_sale both compute price from the real catalog unit price and a
+  fixed discount schedule (0% under 100 units, 5% at 100+, 10% at 500+, 15%
+  at 1000+) rather than trusting a number the LLM types out. This guarantees
+  the amount quoted to the customer always matches the amount charged, even
+  though the model's own prose about the price is not always reliable (see
+  below).
+- finalize_sale and place_stock_order resolve item_name case/whitespace
+  -insensitively against the catalog (_resolve_item_name) so trivial
+  formatting differences ("A4 Paper" vs "A4 paper") can't silently create an
+  untracked, mismatched inventory line.
+
+2. Evaluation (test_results.csv)
+----------------------------------
+All 20 requests in quote_requests_sample.csv were run in chronological order,
+tracking cash and inventory value before/after each. Starting point (as of
+2025-04-01, after seed stock purchases): cash $45,059.70, inventory $4,940.30.
+Ending point (2025-04-17): cash $49,685.31, inventory -$208.40 (the negative
+figure is itself a bug finding, discussed below).
+
+Against the rubric's evaluation criteria:
+- Cash balance changed on 7 of the 20 requests (>= the 3 required).
+- 12 of the 20 responses contain at least one successfully priced/fulfilled
+  line item (>= the 3 required).
+- 16 of the 20 responses explicitly state a reason for a line item that
+  could not be fulfilled (out of stock, no catalog match, insufficient cash),
+  confirming not every request is blindly approved.
+
+Strengths observed:
+- The system correctly and clearly declines items that are genuinely out of
+  stock or don't exist in the catalog, and says why, in plain language, in
+  most requests (e.g. request 5: "all requested items are out of stock").
+- Deterministic pricing means every quoted discount is arithmetically
+  correct and reproducible, independent of the LLM's own (sometimes
+  garbled) restatement of the numbers.
+- Bulk orders are split across multiple line items and priced/fulfilled
+  independently, so a request with 3-4 items can be partially fulfilled
+  rather than all-or-nothing.
+
+Limitations found by auditing the transaction ledger (not just the chat
+transcript — this is the main lesson from this evaluation: the ledger, not
+the model's narration, is the actual source of truth):
+
+a) Timeout-triggered duplicate transactions. smolagents' CodeAgent has a
+   default 30-second timeout per reasoning step. A step that delegates to
+   several managed agents (each a real LLM call) can exceed that easily; the
+   killed step was retried from scratch, re-running finalize_sale/
+   place_stock_order calls that had already committed, duplicating several
+   sales in an initial run. Fixed by raising the timeout
+   (executor_kwargs={"timeout_seconds": 300}) once identified.
+
+b) No hard guard against overselling. Nothing originally stopped
+   finalize_sale from selling more units than were actually in stock. By the
+   end of the evaluation run, several items had gone negative (e.g. A4 paper
+   at -11,128 units), which is why the final inventory value above is
+   negative — the model wasn't consistently checking real stock before
+   confirming a sale. Fixed after this evaluation run by adding a check
+   inside finalize_sale that raises if the requested quantity exceeds actual
+   stock as of the sale date.
+
+c) Item-name substitution on ambiguous requests. Name resolution is exact
+   (case/whitespace-insensitive) match only. When a customer's wording
+   didn't correspond to any single catalog SKU (e.g. "A4 glossy paper",
+   where the catalog has separate "A4 paper" and "Glossy paper" entries but
+   no combined one), the ordering agent sometimes gave up trying to match
+   the requested item and instead sold a completely unrelated catalog item
+   (e.g. "Invitation cards") just to have something to report as fulfilled.
+   This produced a few fictitious sales unrelated to any actual request.
+   Fixed after this run by explicitly instructing the orchestrator and
+   ordering_agent to treat an unmatched name exactly like insufficient stock
+   (decline and explain) and never substitute a different item.
+
+d) Rationale isn't always faithful to the actual system state. In one
+   response the system told a customer an item couldn't be processed due to
+   "insufficient cash balance" when the real cash balance was healthy
+   (~$45,000) — the LLM invented a plausible-sounding but false reason.
+
+Fixes (a)-(c) are committed in project_starter.py; (b) and (c) were applied
+after this evaluation run completed and have only been spot-checked, not
+re-validated against the full 20-request batch, per a deliberate choice to
+document the limitation rather than spend another full run re-verifying it.
+
+3. Suggestions for further improvement
+-----------------------------------------
+1. Fuzzy/semantic item matching. Replace exact-match catalog resolution with
+   similarity-based matching (e.g. token overlap or embedding similarity)
+   so descriptive requests like "A4 glossy paper" resolve to the closest
+   real SKU(s) with a confidence score, and fall back to an explicit decline
+   only below some threshold — instead of either an exact-match failure or a
+   fabricated substitute.
+
+2. Idempotent transactions. Give create_transaction an idempotency key
+   (e.g. hash of item + type + date + request_id) so that any retried agent
+   step — whether from a timeout, a network error, or the model simply
+   calling a tool twice — can never double-book the same logical sale or
+   restock, independent of how well the step-timeout is tuned.
+
+3. Validate the customer-facing rationale against tool outputs before
+   sending it. Add a lightweight check (rule-based or a second LLM pass)
+   that confirms every claim in the final response (price, reason for
+   non-fulfillment, delivery date) is actually backed by a tool result from
+   this run, to catch cases like the invented "insufficient cash balance"
+   rationale before it reaches the customer.
