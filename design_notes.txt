@@ -47,37 +47,42 @@ Decisions behind this split:
 2. Evaluation (test_results.csv)
 ----------------------------------
 All 20 requests in quote_requests_sample.csv were run in chronological order,
-tracking cash and inventory value before/after each. This is the fourth full
-run (the first three surfaced bugs, below, that were fixed in between).
-Starting point (as of 2025-04-01, after seed stock purchases): cash
-$45,059.70, inventory $4,940.30. Ending point (2025-04-17): cash $45,535.68,
-inventory $4,423.20 (both sane and positive — no negative stock anywhere).
+tracking cash and inventory value before/after each. This is the fifth full
+run (the first four surfaced bugs, below, that were fixed in between, most
+recently the requirement that ordering_agent must return a real
+transaction_id before an item can be called "fulfilled"). Starting point (as
+of 2025-04-01, after seed stock purchases): cash $45,059.70, inventory
+$4,940.30. Ending point (2025-04-17): cash $45,334.63, inventory $4,568.75
+(both sane and positive — no negative stock anywhere).
 
-Against the rubric's evaluation criteria, going strictly by the transaction
-ledger (not the response text — see finding (f) below for why that
-distinction matters here):
-- Cash balance changed on 3 of the 20 requests (requests 4, 6, 7 — meets,
-  but does not comfortably clear, the 3-required minimum).
-- Those same 3 requests are the only ones with a real, ledger-backed sale
-  (>= the 3 required, but only just).
-- 17 of the 20 responses explicitly state a reason for a line item that
+Against the rubric's evaluation criteria, going by the cash_balance/
+inventory_value columns (the actual ledger effect), not the response text —
+see finding (f) below for why that distinction still matters even after the
+transaction-id fix:
+- Cash balance changed on 5 of the 20 requests (4, 6, 8, 9, 13) — clears the
+  3-required minimum with a comfortable margin, an improvement over the
+  previous run's bare-minimum 3.
+- Those same 5 requests have a real, ledger-backed transaction (>= the 3
+  required).
+- 15 of the 20 responses explicitly state a reason for a line item that
   could not be fulfilled (out of stock, no catalog match, insufficient
-  stock for the requested delivery date), confirming not every request is
-  approved.
+  stock, item not in catalog), confirming not every request is approved.
 
 Strengths observed:
 - The system correctly and clearly declines items that are genuinely out of
   stock or don't exist in the catalog, and says why, in plain language,
-  often citing the real stock number (e.g. "only 122 sheets available").
-- Deterministic pricing means every quoted discount is arithmetically
-  correct and reproducible, independent of the LLM's own (sometimes
-  garbled) restatement of the numbers.
+  often citing the real stock number (e.g. "only 94 sheets available").
 - No negative stock and no sales of items unrelated to the actual request
   anywhere in this run's ledger (see (b) and (c) below — both confirmed
-  fixed by this run).
-- No quote/charge mismatches: unlike an earlier run, quoting_agent and
-  ordering_agent no longer independently guess different substitute items
-  for the same ambiguous request (see (c2) below — confirmed fixed).
+  fixed).
+- No item-name/price mismatch between what was quoted and what was
+  charged: unlike an earlier run, quoting_agent and ordering_agent no
+  longer independently guess different substitute items for the same
+  ambiguous request (see (c2) below — confirmed fixed).
+- Request 9 is a clean example of the system working end-to-end correctly:
+  it declines two unmatched/insufficient items with accurate reasons, and
+  the one item it does fulfill ("50 packets of Kraft paper", $5.00) matches
+  the real cash increase for that request exactly.
 
 Limitations found by auditing the transaction ledger against the raw request
 text (not just the chat transcript — this is the main lesson from this
@@ -149,39 +154,54 @@ e) Rationale isn't always faithful to the actual system state. The system
    truth to validate them against the way item names can be (see
    suggestion #3).
 
-f) Fabricated "fulfilled" claims with zero backing transaction (found in
-   this run, fixed after it completed). In 5 of the 20 requests (1, 3, 5,
-   16, 17), the orchestrator's customer-facing text stated specific items
-   were "Fulfilled" at a stated price — but ordering_agent was never even
-   invoked for that request, so no finalize_sale transaction exists in the
-   ledger at all (cash_balance/inventory_value are unchanged from baseline
-   for those rows in test_results.csv). This is more serious than (c2):
-   it's not a wrong-item charge, it's a complete fabrication of a
-   successful transaction. Root cause: the orchestrator, once it had a
-   price from quoting_agent, sometimes composed a "success" response
-   without ever completing step 4 (delegating to ordering_agent). Fixed
-   after this run by requiring the orchestrator to only state an item is
-   fulfilled if ordering_agent's response for that exact item, in that run,
-   included a real transaction_id — otherwise it must report the item as
-   not fulfilled. Smoke-tested (not re-validated at full scale): the exact
-   scenario from request 1 above now correctly reports non-fulfillment
-   instead of fabricating success — though that same smoke test is what
-   surfaced the cash-balance date hallucination described in (e). Per a
-   deliberate choice not to spend another full ~30-minute run chasing
-   further hallucinations, this fix is included in project_starter.py but
-   test_results.csv above still reflects the pre-fix (fabricating) behavior
-   for requests 1, 3, 5, 16, and 17 — treat those five rows' "fulfilled"
-   claims as unreliable; the other 15 rows are consistent with the ledger.
+f) Fabricated "fulfilled" claims with zero backing transaction (found
+   across two runs; partially, not fully, mitigated). An earlier run had 5
+   of 20 requests where the customer-facing text stated specific items were
+   "Fulfilled" at a stated price with no finalize_sale transaction behind
+   them at all. This was addressed by requiring the orchestrator to only
+   call an item fulfilled if ordering_agent's response for that item
+   included a real transaction_id. In this run, that cut the problem
+   roughly in half but did not eliminate it: requests 16 and 17 both again
+   state an item is "Fulfilled" (100 lb cover stock; 500 paper plates) with
+   no corresponding change in cash_balance/inventory_value for those rows.
+   The rule only works if the orchestrator's own accounting of "did
+   ordering_agent return a transaction_id" is accurate, and that check
+   itself is just another LLM judgment call it can still get wrong.
+
+g) Claimed sale amounts don't always reconcile with the actual cash
+   movement (new in this run). Even for requests that do involve a real
+   transaction, the dollar figures narrated to the customer sometimes
+   don't match the ledger:
+   - Request 1: claims ~$9.75 in sales, but cash only moved by -$0.50.
+   - Request 6: claims $87.75 in sales, but cash moved by -$42.25 (a
+     decrease, consistent with a stock_orders restock cost exceeding sales
+     revenue, not with the stated sales total).
+   - Request 8: claims $540.50 across four items (and exposes internal
+     transaction IDs to the customer, which is its own minor information-
+     disclosure issue), but cash only increased by $128.90.
+   - Request 13: the opposite failure — cash increased by $104.40 with no
+     transaction disclosed to the customer at all; the response claims the
+     entire order was declined.
+   Request 9 is the exception that proves the rule: its single $5.00 claim
+   matches the real cash change exactly, showing the mechanism works when
+   the model gets it right — it just doesn't do so consistently.
 
 Overall assessment: guardrails that are enforceable in code (catalog name
-resolution, price computation, stock checks, the transaction-id-required
-rule) have all been verified to hold. Guardrails that depend entirely on
-the LLM (gpt-4o-mini here) correctly following a written instruction —
-using the right date, not inventing a rationale, always completing a
-multi-step delegation — were reduced in severity across four rounds of
-fixes, but not eliminated, and probably can't be through prompting alone.
-That's a property of using a smaller model as the decision layer, not a
-bug in any single instruction.
+resolution, deterministic price computation via quote_line_item, the stock
+guard in finalize_sale) have all been verified to hold exactly across every
+run. Guardrails that depend on the LLM (gpt-4o-mini here) correctly
+following a written instruction — using the right date, not inventing a
+rationale, accurately reporting whether a transaction actually happened,
+never mentioning cash balance or transaction IDs externally — were reduced
+in severity across five rounds of fixes, but not eliminated, and each fix
+mostly relocated the failure mode rather than removing the underlying
+cause. That's a property of relying on a smaller model's self-reporting for
+anything code can't independently verify, not a bug in any single
+instruction. The practical implication: don't trust this system's
+customer-facing text as an audit trail — only the transactions table is
+reliable, which is exactly why every finding above was diagnosed by cross-
+checking test_results.csv against the database rather than reading the
+response text at face value.
 
 3. Suggestions for further improvement
 -----------------------------------------
@@ -202,14 +222,24 @@ bug in any single instruction.
 
 3. Validate the customer-facing rationale against tool outputs before
    sending it. Add a lightweight check (rule-based or a second LLM pass)
-   that confirms every claim in the final response (price, reason for
-   non-fulfillment, delivery date) is actually backed by a tool result from
-   this run, to catch cases like the invented "insufficient cash balance"
-   rationale, or the fabricated-fulfillment cases in finding (f), before
-   they reach the customer.
+   that confirms every dollar figure and fulfillment claim in the final
+   response is actually backed by a tool result from this run — e.g. sum
+   the transaction_id-bearing sales ordering_agent actually reported and
+   compare that total against whatever number the orchestrator puts in the
+   customer-facing text, rejecting/regenerating the response if they don't
+   match. This would catch findings (f) and (g) deterministically instead
+   of relying on the orchestrator to police itself.
 
-4. Use a stronger model for the orchestrator. Several remaining issues
-   (date hallucination, skipping a delegation step while still claiming
-   success) are instruction-following failures rather than logic bugs.
-   Swapping MODEL_ID from gpt-4o-mini to a stronger model would likely
-   reduce their frequency, at higher per-request cost.
+4. Add a deterministic post-processing filter on the final response. Before
+   returning the orchestrator's answer, strip or reject any text matching
+   patterns like "cash balance", "transaction ID", or similar internal
+   terms, as a code-level safety net that doesn't depend on the model
+   remembering the instruction every time (it currently doesn't, per (e)
+   and (g)).
+
+5. Use a stronger model for the orchestrator. Every remaining issue in this
+   reflection (date hallucination, skipping a delegation step while still
+   claiming success, dollar amounts that don't reconcile with the ledger)
+   is an instruction-following failure rather than a logic bug. Swapping
+   MODEL_ID from gpt-4o-mini to a stronger model would likely reduce their
+   frequency, at higher per-request cost.

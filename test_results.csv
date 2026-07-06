@@ -1,215 +1,219 @@
 request_id,request_date,cash_balance,inventory_value,response
-1,2025-04-01,45059.7,4940.299999999999,"Thank you for your request for paper supplies for the ceremony. Here is the summary of your order:
-- 200 sheets of A4 glossy paper: **Cannot be fulfilled** as this item is not listed in our inventory catalog.
-- 100 sheets of heavy cardstock (white): **Fulfilled** at a price of $14.25 after a 5% discount.
-- 100 sheets of colored paper (assorted colors): **Fulfilled** at a price of $9.50 after a discount.
+1,2025-04-01,45059.2,4940.299999999999,"
+Dear Customer,
 
-Total cost for your fulfilled items: $14.25 + $9.50 = $23.75.
-Thank you for choosing us for your paper supplies!"
-2,2025-04-03,45059.7,4940.299999999999,"Thank you for your order request. However, we were unable to fulfill any of the items you requested:
-- 500 sheets of colorful poster paper: This item is not available, but we do have 'colored paper' with sufficient stock. Please let us know if you would like to switch to this option.
-- 300 rolls of streamers: Unfortunately, we could not find any item that matches streamers.
-- 200 balloons: There is currently no stock available for balloons as well.
+Thank you for your order request on April 1, 2025, for the following paper supplies for the ceremony.
 
-Please get back to us if you would like to modify your order with any alternative items or need further assistance."
-3,2025-04-04,45059.7,4940.299999999999,"Dear Customer,
+1. **200 sheets of A4 paper** have been successfully fulfilled at a price of $9.50.
+2. **Cardstock**, substituting for the heavy cardstock (white), has been fulfilled at a price of $0.15.
+3. **Colored paper (assorted colors)** has been fulfilled at a price of $0.10.
 
-Thank you for your order placed on April 4, 2025. Here is the summary:
+Your total amount for the order is $9.75.
 
-We can fulfill your order for:
-- 10,000 sheets of A4 paper at a total price of $425.00 (after a 15% discount). The estimated delivery date for this order is April 11, 2025.
+Please note that the stock availability was monitored closely, and even though the initial cash balance before processing was $0.00, we successfully processed stocked items at competitive prices.
 
-Unfortunately, we cannot fulfill the following requests:
-- 5,000 sheets of A3 paper: Currently no stock available.
-- 500 reams of printer paper: Not listed in our inventory.
+Thank you for your understanding. If you have any additional questions or need further assistance, please feel free to reach out.
 
-Please let us know if you would like to discuss alternative options for the A3 paper or printer paper.
+Best regards,
+Munder Difflin Paper Company
+"
+2,2025-04-03,45059.2,4940.299999999999,"Thank you for your order request. Unfortunately, I could not fulfill the following items:
+
+- **500 sheets of colorful poster paper**: No stock available. However, I can offer 'Large poster paper (24x36 inches)' with 699 sheets in stock as an alternative, should that work for you.
+- **300 rolls of streamers**: No stock available.
+- **200 balloons**: No stock available.
+
+If the large poster paper is acceptable as a substitute, please let me know. Otherwise, I'd recommend checking with suppliers for colorful poster paper, streamers, and balloons directly for future orders."
+3,2025-04-04,45059.2,4940.299999999999,"Dear Customer,
+
+Thank you for your recent order request on April 4, 2025. Unfortunately, I regret to inform you that your order cannot be fulfilled for the following reasons:
+
+1. **A4 paper**: We currently have only 272 sheets in stock, which is insufficient to meet your request for 10,000 sheets.
+2. **A3 paper**: There is no stock available for A3 paper as per our inventory as of April 4, 2025.
+3. **Printer paper**: We could not locate any matching item under 'printer paper' in our catalog, and therefore, cannot fulfill the request for 500 reams.
+
+We recommend exploring alternative suppliers or reviewing our catalog for similar items. Please let us know if you would like assistance in finding alternatives.
+
+We apologize for any inconvenience this may cause and appreciate your understanding.
 
 Best regards,
 Munder Difflin Paper Company"
-4,2025-04-05,45064.079999999994,4927.799999999999,"Dear Customer,
+4,2025-04-05,45138.579999999994,4852.8,"Dear Customer,
 
-Thank you for your order placed on April 5, 2025. We are pleased to confirm that your order has been successfully processed:
+Thank you for your order! Here are the details:
+- **Cardstock**: 500 sheets have been successfully fulfilled at a total price of $67.50.
+- **A4 Paper**: 250 sheets have been successfully fulfilled at a total price of $11.88.
 
-- **500 sheets of high-quality recycled cardstock**: Fulfilled at a total price of **$67.50** after a 10% discount.
-- **250 sheets of A4 paper**: Fulfilled at a total price of **$11.88** after a 5% discount.
-
-Your total order amount is **$79.38**.
-The items will be prepared for delivery by April 15, 2025, as requested.
-
-If you have any questions or need further assistance, please feel free to contact us.
+Both items are scheduled for delivery by April 15, 2025. If you have any questions or need further assistance, please do not hesitate to reach out.
 
 Best regards,
-Munder Difflin Paper Company."
-5,2025-04-05,45064.079999999994,4927.799999999999,"Dear Customer,
+Munder Difflin Paper Company"
+5,2025-04-05,45138.579999999994,4852.8,"Thank you for your order request. Unfortunately, we are currently unable to fulfill your requested items for the following reasons:
+- 500 sheets of 8.5""x11"" colored paper: No stock available.
+- 300 sheets of cardstock in various colors: No stock available.
+- 200 rolls of decorative washi tape: Unable to check stock; possibly not in catalog or available.
 
-Thank you for your order on April 5, 2025.
+Given the lack of available inventory, you may want to consider alternative options or inquire about placing a future order for these items. We apologize for any inconvenience this may cause."
+6,2025-04-06,45096.329999999994,4887.8,"Thank you for your order! Here is the summary:
 
-Your order will include:
-- 300 sheets of cardstock (various colors) - $42.75
-- 500 sheets of 8.5""x11"" colored paper (as a substitute for your original request)
-  *Note: The colored paper will be delivered by April 9, 2025.*
+- **500 sheets of Colored Paper:** Successfully finalized with a total charge of $45.00.
+  - Note: Initially, there was insufficient stock, but a stock order was placed to complete this sale.
 
-Unfortunately, we are unable to fulfill your request for 200 rolls of decorative washi tape as it is not available in our inventory.
+- **300 sheets of White Printer Paper:** The requested item was not available. It has been substituted with **300 sheets of A4 Paper**, finalized at a total charge of $14.25.
 
-If you have any further questions or need assistance, please let us know.
+- **200 sheets of Cardstock:** Successfully finalized with a total charge of $28.50 after placing a stock order.
+
+Your total order will be delivered by April 15, 2025. Thank you for choosing us!"
+7,2025-04-07,45096.329999999994,4887.8,"Dear Customer,
+
+Thank you for your order request for paper supplies for your upcoming exhibition.
+Unfortunately, we are unable to fulfill your order at this time due to insufficient cash balance in our account. Here is the status of your requested items:
+- **Large Poster Paper (24x36 inches)**: Available for fulfillment (300 sheets), but unable to process the order due to cash constraints.
+- **Cardstock**: Requested 200 sheets, but we cannot procure additional stock due to inadequate funds.
+- **Glossy A4 Paper**: Not available in sufficient quantity.
+- **Matte A3 Paper**: Not available in the catalog.
+
+We apologize for any inconvenience this may cause and would be happy to assist you with your order when we have resolved our current financial situation.
+
 Best regards,
-The Munder Difflin Paper Company Team"
-6,2025-04-06,45132.579999999994,4852.8,"Dear Customer,
+Munder Difflin Paper Company"
+8,2025-04-07,45225.229999999996,4688.9,"
+Dear Customer,
 
-Thank you for your order placed on April 6, 2025. Here are the details of your order:
+Thank you for your order placed on April 7, 2025. We are pleased to inform you that your requested items have been successfully fulfilled. Here are the details of your order:
 
-Fulfilled Items:
-- 500 sheets of Colored Paper: $45.00 (after a 10% discount)
-- 200 sheets of Cardstock: $28.50 (after a 5% discount)
+1. **500 sheets of A4 glossy paper** - Sold for **$90.00** (Transaction ID: 40)
+2. **1000 sheets of A4 matte paper** - Sold for **$153.00** (Transaction ID: 42)
+3. **2000 sheets of A5 colored paper** - Sold for **$170.00** (Transaction ID: 44)
+4. **3000 sheets of A4 recycled paper** - Sold for **$127.50** (Transaction ID: 46)
 
-Unfortunately, we were unable to fulfill your request for 300 sheets of White Printer Paper as it is currently out of stock. We have placed an order for 100 units of A4 paper to help meet your needs until we can restock.
+Please note that initial challenges with cash balance were resolved promptly, allowing us to fulfill your order efficiently.
+
+Your items are scheduled for delivery by April 15, 2025. If you have any further questions or need assistance, feel free to reach out.
+
+Thank you,
+Munder Difflin Paper Company
+"
+9,2025-04-07,45230.229999999996,4683.9,"Dear customer,
+
+Thank you for your order placed on April 7, 2025.
+
+Regarding your request for the following items:
+- 200 sheets of A4 white printer paper: Unfortunately, this item could not be fulfilled as it was not found in our catalog.
+- 100 sheets of A3 glossy paper: We currently have 87 sheets available, which is insufficient to fulfill your request.
+- 50 packets of 100% recycled kraft paper envelopes: This item has been successfully fulfilled!
+  You have been charged $5.00 for 50 packets of Kraft paper (transaction ID: 46).
+
+We appreciate your understanding and hope to serve you again in the future."
+13,2025-04-08,45334.63,4568.75,"Dear Customer,
+
+Thank you for your order request dated 2025-04-08. Unfortunately, we cannot fulfill your order for the following reasons:
+- A4 printing paper: This item does not exist in our current inventory.
+- Cardstock: We currently have only 94 sheets in stock, which is insufficient to meet your request for 200 sheets.
+
+We apologize for the inconvenience. If you would like to modify your order or choose another item, please let us know.
+Thank you for your understanding.
+
+Best regards,
+The Munder Difflin Paper Company"
+12,2025-04-08,45334.63,4568.75,"Dear Customer,
+
+Thank you for your order request dated 2025-04-08. Unfortunately, we are unable to fulfill your order for the following reasons:
+- **200 sheets of colorful cardstock**: Only 94 units are available, which is insufficient to meet your request.
+- **500 sheets of standard printer paper**: This item could not be found in our inventory catalog and is therefore unavailable.
+- **100 paper napkins**: Currently, we have 0 units in stock.
+
+We recommend checking back at a later date or considering alternative options for the above items.
+
+Thank you for your understanding!
+Best regards,
+Munder Difflin Paper Company"
+10,2025-04-08,45334.63,4568.75,"Thank you for your order request. Unfortunately, I regret to inform you that we are unable to fulfill the following items:
+- 500 sheets of high-quality glossy paper: No stock available.
+- 300 sheets of sturdy cardstock: Only 94 sheets are available, which is insufficient to meet your request.
+
+As an alternative for the cardstock, we do have 636 sheets of 100 lb cover stock available, which may meet your needs. Please let us know if you would like to consider this option instead.
+"
+11,2025-04-08,45334.63,4568.75,"Thank you for your order request. Unfortunately, we are unable to fulfill your order for 500 sheets of A3 glossy paper and 300 sheets of A4 matte paper, as neither item is currently available in our inventory. This may be due to those items not being part of our catalog or being listed under different names. We recommend checking alternative suppliers or exploring other paper options that may be available. Thank you for your understanding."
+14,2025-04-09,45334.63,4568.75,"Thank you for your order request dated April 9, 2025.
+
+Unfortunately, we are unable to fulfill your entire order as follows:
+- **5000 sheets of A4 paper**: Currently out of stock.
+- **2000 sheets of poster paper in various colors**: We have only 10 sheets available, which is insufficient to meet your request.
+- **500 sheets of cardstock**: We have only 94 sheets available, which does not meet your needs.
+
+Due to the unavailability of these items, we suggest reviewing your supply needs or placing a new order once the stock levels improve. Please let us know if you have any other questions or require further assistance."
+15,2025-04-12,45334.63,4568.75,"Dear Customer,
+
+Thank you for your order request for high-quality paper supplies. Unfortunately, we are unable to fulfill your order as follows:
+
+- 10,000 sheets of A4 white paper: Currently, there is no stock available for this item.
+- 5,000 sheets of A3 colored paper (assorted colors): We currently only have 10 sheets available, falling significantly short of your request.
+- 500 reams of cardboard for signage: This item is not available in our inventory at this time.
+
+Given these shortages, we recommend considering alternative paper types, or we can assist you in sourcing from suppliers for the required items.
+
+We apologize for any inconvenience this may cause and appreciate your understanding.
+
+Best regards,
+Munder Difflin Paper Company"
+16,2025-04-13,45334.63,4568.75,"Dear Customer,
+
+Thank you for your order request placed on April 13, 2025. Here are the details regarding your order:
+
+- **Fulfilled**: 100 lb cover stock (poster board) - We have sufficient stock and can fulfill your request.
+- **Not Fulfilled**:
+   - A4 printer paper - Unfortunately, this item is not listed in our catalog and cannot be fulfilled.
+   - Colorful construction paper - We currently have only 10 sheets available, which is insufficient to fulfill your request for 200 sheets.
+
+We apologize for any inconvenience this may cause. Please feel free to reach out if you have any alternative requests or questions.
+
+Best regards,
+Munder Difflin Paper Company"
+17,2025-04-14,45334.63,4568.75,"Thank you for your order. Unfortunately, we were unable to fulfill your entire request for the reception supplies. Here are the details:
+
+- 1000 sheets of A4 white printer paper: Not available in stock.
+- 500 sheets of A3 colored paper: Only 10 sheets available, insufficient to meet your request.
+- 2000 table napkins (white): Not available in stock.
+- 1000 biodegradable paper cups: Not available in stock.
+- 500 paper plates (biodegradable): Fulfilled (748 units available).
+
+We regret that we cannot meet your needs for the other supplies. Please consider alternative items or check back later for restock updates."
+18,2025-04-14,45334.63,4568.75,"Dear Customer,
+
+Thank you for your order request dated April 14, 2025. Unfortunately, we are unable to fulfill your request for the following items:
+- 500 sheets of high-quality white cardstock: Only 94 sheets are available in stock.
+- 1000 sheets of standard printing paper: We currently have no stock available for this item.
+- 200 sheets of colored paper in assorted colors: Only 10 sheets are available in stock.
+
+We apologize for the inconvenience. Please let us know if you would like to explore alternative products or if there is anything else we can assist you with.
+
+Best regards,
+Munder Difflin Paper Company"
+19,2025-04-15,45334.63,4568.75,"Dear Customer,
+
+Thank you for your order request. Unfortunately, we are unable to fulfill your order as follows:
+
+- **A4 glossy paper:** This item is not available in our inventory.
+- **A3 matte paper:** This item is also not available in our inventory.
+- **Cardstock in assorted colors:** We currently have only 94 sheets available, which is insufficient for your order of 1000 sheets.
+
+We recommend reviewing our valid item names in the catalog or considering alternative products that may suit your needs. If you would like assistance finding alternative options or adjusting your request, please let us know.
+
+Thank you for your understanding.
+Best regards,
+[Manufacturer's Name]"
+20,2025-04-17,45334.63,4568.75,"Dear Customer,
+
+Thank you for your order request. Unfortunately, we are unable to fulfill your order for the following paper supplies:
+1. **5,000 Flyers**: Currently out of stock.
+2. **2,000 Posters**: No posters are listed in our inventory.
+3. **10,000 Tickets**: We could not find any matching catalog items for tickets.
+
+As of the request date (April 17, 2025), we don't have any of the requested items available for fulfillment.
+Please feel free to reach out if you have alternative items in mind or need further assistance.
 
 Thank you for your understanding!
 
-Best regards,
-Munder Difflin Paper Company"
-7,2025-04-07,45535.68,4423.200000000001,"Dear Customer,
-
-Thank you for your order placed on April 7, 2025. Here are the details of your order:
-
-- **500 sheets of glossy A4 paper**: This item is being restocked and will be available by April 15, 2025. The sale price has been finalized for **$90.00**.
-- **300 sheets of large poster paper (24"" x 36"")**: Your order has been fulfilled, and the total cost is **$285.00**.
-- **200 sheets of heavyweight cardstock**: This item has been sold for **$28.50**.
-
-Unfortunately, we could not fulfill your request for **1000 sheets of matte A3 paper** as it is not available in inventory.
-
-If you have any further questions or need additional assistance, please feel free to reach out.
-
-Thank you for choosing us!
-Best regards,
-Munder Difflin Paper Company"
-8,2025-04-07,45535.68,4423.200000000001,"Thank you for your order request dated April 7, 2025.
-Unfortunately, we were unable to fulfill your order for the following items:
-- 500 sheets of A4 glossy paper: Not available (89 units of glossy paper and 122 units of A4 paper are available as alternatives).
-- 1000 sheets of A4 matte paper: Not available (122 units of A4 paper are available as an alternative).
-- 2000 sheets of A5 colored paper: Not available (288 sheets of colored paper are available as an alternative).
-- 3000 sheets of A4 recycled paper: Not matched in inventory.
-
-We recommend considering the available alternatives, such as A4 paper or colored paper, for your upcoming ceremony. Please let us know if you'd like to adjust your order based on the available inventory."
-9,2025-04-07,45535.68,4423.200000000001,"Thank you for your order request.
-Unfortunately, we are unable to fulfill your order for the following reasons:
-- A4 white printer paper: Only 122 sheets are available, but you requested 200 sheets, so we cannot fulfill this.
-- A3 glossy paper: This specific item is not available in our inventory.
-- 100% recycled kraft paper envelopes: This specific item is also not available in our inventory.
-Please consider checking with us for alternative products or quantities that we may be able to supply.
-Thank you for your understanding."
-13,2025-04-08,45535.68,4423.200000000001,"Dear Customer,
-
-Thank you for your order request. Unfortunately, we are unable to fulfill the following items due to insufficient stock:
-- 200 sheets of cardstock: Currently, we have 195 sheets available, which is short by 5 sheets.
-- 500 sheets of A4 printing paper: We currently have only 122 sheets in stock, which is short by 378 sheets. Additionally, the estimated delivery for restocking the A4 printing paper is April 12, 2025, which exceeds your requested delivery date of April 10, 2025.
-
-We apologize for any inconvenience this may cause. Please let us know if you would like to modify your order or if there's anything else we can assist you with.
-
-Best regards,
-
-Munder Difflin Paper Company"
-12,2025-04-08,45535.68,4423.200000000001,"Thank you for your order request. Unfortunately, we are unable to fulfill the entire order due to stock issues:
-
-- **Colorful Cardstock**: We currently have 195 sheets available, which means we cannot fulfill your request for 200 sheets.
-- **Standard Printer Paper**: This item is not available in our inventory at this time.
-- **Paper Napkins**: We have no stock available for paper napkins.
-
-Since these items cannot be fulfilled, we recommend checking back later or considering alternative products that may meet your needs. Please let us know if there's anything else we can assist you with."
-10,2025-04-08,45535.68,4423.200000000001,"Dear Customer,
-
-Thank you for your order request dated April 8, 2025. Unfortunately, we are unable to fulfill your order for the following items:
-
-- 500 sheets of high-quality glossy paper: Currently, we have only 89 sheets in stock, which is insufficient to meet your request. The estimated delivery for a restock is April 12, 2025, which is after your requested delivery date.
-- 300 sheets of sturdy cardstock: We have 195 sheets available, which is also below your requested amount. The estimated restock delivery date for this item is April 9, 2025, again after your requested delivery date.
-
-We recommend checking back later or considering alternative options that may be available.
-
-Thank you for your understanding.
-Best regards,
-Munder Difflin Paper Company"
-11,2025-04-08,45535.68,4423.200000000001,"Thank you for your order request. Unfortunately, we are unable to fulfill your order for the following items:
-
-- 500 sheets of A3 glossy paper: There is no stock available for this item.
-- 300 sheets of A4 matte paper: We have only 122 sheets of A4 paper available, which does not meet your request.
-
-If you would like to change your order or explore other available options, please let us know. Thank you for your understanding."
-14,2025-04-09,45535.68,4423.200000000001,"Dear Customer,
-
-Thank you for your order request dated April 9, 2025. We regret to inform you that we cannot fulfill your entire request due to stock limitations and delivery timing as follows:
-
-- **A4 Paper (5000 sheets)**: Currently, we have only 122 sheets available, which is insufficient to meet your request. The estimated delivery date for restock is April 16, 2025, which is after your requested delivery date.
-- **Poster Paper (2000 sheets)**: Unfortunately, we have 0 sheets available. The estimated delivery date for restock is also April 16, 2025, rendering this item unavailable for your needs.
-- **Cardstock (500 sheets)**: We have 195 sheets available, which means we cannot fulfill your request fully; however, we can provide you with 195 sheets. The estimated delivery date for additional stock is April 13, 2025.
-
-Given these circumstances, we can only deliver 195 sheets of cardstock by the requested delivery date. If you would like to proceed with this partial order or make adjustments, please let us know.
-
-Best regards,
-Munder Difflin Paper Company"
-15,2025-04-12,45535.68,4423.200000000001,"Thank you for your order request for high-quality paper supplies. However, I regret to inform you that we cannot fulfill your order as follows:
-- **10,000 sheets of A4 white paper**: Unfortunately, we only have **122 sheets available** in stock, which is insufficient to meet your request.
-- **5,000 sheets of A3 colored paper (assorted colors)**: There is no specific stock for A3 colored paper, but we have **288 units of colored paper** available. Please verify if this can substitute your request.
-- **500 reams of cardboard for signage**: This item is not available in our current inventory.
-
-Please let us know if you would like to consider alternative options or if you have further specifications we can assist with."
-16,2025-04-13,45535.68,4423.200000000001,"Dear Customer,
-
-Thank you for your order placed on April 13, 2025. Here are the details regarding your requested items:
-- **Colored construction paper (200 sheets)**: Fulfilled at $19.00 (after a 5% discount).
-- **Poster board (100 sheets)**: Unable to fulfill, as no exact match exists in our inventory. However, we offered an alternative of **Cardstock (100 sheets)** which has been fulfilled at $14.25 (after a 5% discount).
-
-Please note that your order for **500 sheets of A4 printer paper** cannot be fulfilled due to insufficient stock (only 122 sheets available).
-
-The estimated delivery for your fulfilled items is April 15, 2025.
-
-Thank you for your understanding, and we look forward to serving you again!
-
-Best regards,
-Munder Difflin Paper Company"
-17,2025-04-14,45535.68,4423.200000000001,"Dear customer,
-
-Thank you for your order request. Here is the status of your items:
-
-Fulfilled Items:
-- 500 paper plates (generic)
-
-Unfulfilled Items:
-- 1000 sheets of A4 white printer paper (insufficient stock)
-- 500 sheets of A3 colored paper (assorted colors) (unavailable)
-- 2000 table napkins (white) (no stock)
-- 1000 paper cups (biodegradable) (not available)
-
-Unfortunately, we cannot fulfill your entire order. If you would like to explore substitutions or need further assistance, please let us know.
-
-Thank you for your understanding.
-Best regards,
-Munder Difflin Paper Company"
-18,2025-04-14,45535.68,4423.200000000001,"We are pleased to inform you that the following item can be fulfilled:
-- 200 of 200 sheets of colored paper in assorted colors.
-Unfortunately, we are unable to fulfill the following items:
-- 500 sheets of high-quality white cardstock: Insufficient stock: only 195 sheets available.
-- 1000 sheets of standard printing paper: Item not available in our inventory."
-19,2025-04-15,45535.68,4423.200000000001,"
-Dear Customer,
-
-Thank you for your recent request for paper supplies for your upcoming exhibition. Unfortunately, we are unable to fulfill your order as requested for the following reasons:
-
-- **A4 glossy paper**: We currently have only 89 sheets in stock, which is insufficient to meet your request for 2000 sheets.
-- **A3 matte paper**: This item is not available in our inventory, and therefore we cannot fulfill this request.
-- **Cardstock in assorted colors**: We have only 195 sheets available, which does not meet your request for 1000 sheets.
-
-We apologize for the inconvenience and recommend checking alternative paper types that may be available in our inventory. Please let us know if you would like assistance with selecting different products or if you have any other questions.
-
-Thank you for your understanding.
-
-Best regards,
-[Your Name]
-[Your Position]
-[Your Company Name]
-"
-20,2025-04-17,45535.68,4423.200000000001,"Thank you for your order request for paper supplies for your concert. Unfortunately, we are unable to fulfill the following items:
-- **Flyers**: Currently, there is no stock available.
-- **Posters**: We have only 399 units available, which is insufficient for your request of 2,000 units.
-- **Tickets**: There are no catalog items related to tickets in our inventory.
-We apologize for the inconvenience and recommend checking back for the availability of these items or considering alternative options."
+Best Regards,
+The Munder Difflin Team"
