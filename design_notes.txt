@@ -38,10 +38,9 @@ call (more on that below).
 Evaluation
 
 I ran all 20 requests from quote_requests_sample.csv through the system,
-tracking cash and inventory before and after each one. The most recent run
-started at $45,059.70 cash / $4,940.30 inventory and ended at $45,334.63 /
-$4,568.75. Nothing went negative, which wasn't always true in earlier runs
-(more on that below too).
+tracking cash and inventory before and after each one. The run started at
+$45,059.70 cash / $4,940.30 inventory and ended at $45,334.63 / $4,568.75,
+with no negative stock anywhere.
 
 Looking at the actual ledger rather than just reading the response text:
 cash balance changed on 5 of the 20 requests, and those 5 all have a real
@@ -53,59 +52,53 @@ explaining why.
 
 What works well: when an item genuinely doesn't exist or is out of stock,
 the system says so plainly and usually cites the real number ("only 94
-sheets available"). Request 9 is a good example of everything working
-end to end — it declines two items with accurate reasons and correctly
-sells the third one, and the price it charges matches the cash change in
-the ledger exactly.
+sheets available"). Request 9 is a good example of everything working end
+to end — it declines two items with accurate reasons and correctly sells
+the third one, and the price it charges matches the cash change in the
+ledger exactly.
 
-Where it falls short is consistency, and this took a few rounds of testing
-to fully see. I didn't just read the response text and trust it — I kept
-cross-checking it against the actual transactions table, and that's where
-most of these came from:
+Limitations
 
-Early on, a couple of things were flat-out broken: the agent's code-
-execution step had a 30 second timeout that could get hit mid-run, and a
-retried step would end up re-selling something it had already sold. Stock
-levels weren't checked before a sale went through, so a few items went
-into negative stock. And when a customer's wording didn't match a catalog
-item exactly (like "A4 glossy paper," which isn't a real SKU — the catalog
-has "A4 paper" and "Glossy paper" separately), the ordering agent would
-sometimes just sell a completely unrelated item instead of saying it
-couldn't find a match. I fixed all three of these — raised the timeout,
-added a stock check before any sale, and told the agents explicitly to
-decline rather than substitute.
+The pattern I kept running into: anything I could enforce in code holds up
+every time — item name resolution, the discount math, the check that
+blocks a sale from exceeding real stock. Anything that instead depends on
+the model accurately reporting what it did doesn't hold up consistently.
+A few things worth calling out specifically, based on this run's
+test_results.csv:
 
-Fixing the substitution problem uncovered a subtler version of it: the
-quoting agent and the ordering agent were each independently guessing how
-to interpret an ambiguous item name, and sometimes landed on two different
-items — so a customer got quoted one price for "Glossy paper" and then
-actually charged a different amount for "A4 paper." I fixed this by making
-inventory_agent the only agent allowed to resolve an item name, and having
-the orchestrator pass that exact resolved name to everyone else instead of
-letting each agent reinterpret the customer's wording on its own.
-
-Even after that fix, two things still show up in this latest run:
-
-- A few responses claim an item was "fulfilled" when there's no matching
-  transaction in the ledger at all (requests 16 and 17 here). I added a
-  rule requiring the orchestrator to only say "fulfilled" if the ordering
-  agent actually returned a transaction ID, and that cut this problem
-  roughly in half, but it didn't eliminate it — the rule still depends on
-  the model reporting honestly, which it doesn't always do.
-- The dollar amounts in a few responses don't match what the ledger shows.
-  Request 1 talks about $9.75 in sales but cash only moved by $0.50.
-  Request 8 lists $540.50 across four items (and mentions internal
-  transaction IDs, which it shouldn't) but cash only went up by $128.90.
-  Request 13 is the reverse case — cash went up $104 with nothing
+- A couple of responses claim an item was "fulfilled" with no matching
+  transaction in the ledger at all (requests 16 and 17). There's a rule
+  requiring the orchestrator to only say "fulfilled" if ordering_agent
+  actually returned a transaction ID, but that rule still depends on the
+  model reporting honestly about its own actions, so it isn't airtight.
+- A few responses state dollar amounts that don't match what actually
+  happened. Request 1 talks about $9.75 in sales but cash only moved by
+  $0.50. Request 8 lists $540.50 across four items but cash only went up
+  $128.90. Request 13 is the reverse case — cash went up $104 with nothing
   disclosed to the customer at all.
+- A few responses mention things they shouldn't — cash balance (requests 1
+  and 7) or an internal transaction ID (requests 8 and 9) — despite being
+  explicitly instructed never to reveal either to a customer.
+- Item matching is exact (aside from case and whitespace), so a compound
+  description like "A4 glossy paper" won't match anything, even though the
+  catalog has "A4 paper" and "Glossy paper" as separate items. The system
+  correctly declines rather than guessing at a substitute, but that also
+  means it under-fulfills requests a human would probably read as
+  reasonable.
 
-Basically: everything I could enforce in code (item matching, pricing
-math, the stock check) holds up every time. Anything that depends on the
-model accurately reporting what it did, or using the right date, or not
-inventing a reason — that got better with each fix but never became fully
-reliable. I don't think that's fixable by tweaking the instructions
-further; it's a limitation of using a small model to self-report on its
-own actions.
+During development I also found and fixed a few more serious issues along
+the way — a step timeout that caused the same sale to get recorded twice,
+sales going through with no stock check (which pushed some items into
+negative inventory), and the ordering agent selling a completely unrelated
+item when it couldn't find a match for what was actually requested. None
+of those show up in this run, but they're the reason the stock check and
+the single-resolver rule mentioned above exist at all.
+
+Overall, I don't think the remaining issues are fixable by further tweaking
+the wording of instructions. They come from relying on a small model
+(gpt-4o-mini) to self-report accurately on its own actions instead of
+having every claim independently verified — that's a limitation of the
+approach, not of any one prompt.
 
 Suggestions for improvement
 
