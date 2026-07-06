@@ -709,8 +709,13 @@ inventory_agent = ToolCallingAgent(
     name="inventory_agent",
     description=(
         "Checks current stock levels for catalog items and estimates supplier restock "
-        "delivery dates. Give it item names (matching the catalog exactly) and a date; "
-        "it reports whether stock is sufficient and, if not, when a restock would arrive."
+        "delivery dates. Give it the customer's requested item description and a date; "
+        "it is the ONLY agent that decides which catalog item a request maps to. For "
+        "each item, its final_answer MUST explicitly state either "
+        "'RESOLVED: <original description> -> <exact canonical catalog item_name>' "
+        "(the exact string check_item_stock returned) or "
+        "'UNMATCHED: <original description>' if check_item_stock could not match it — "
+        "never guess or state a canonical name that check_item_stock did not confirm."
     ),
 )
 
@@ -804,8 +809,11 @@ quoting_agent = ToolCallingAgent(
     model=model,
     name="quoting_agent",
     description=(
-        "Prices customer requests. Looks up the item catalog to match requested items "
-        "to exact catalog names, searches quote history for similar past orders as "
+        "Prices items. IMPORTANT: only ever call quote_line_item with the exact "
+        "canonical catalog item_name that inventory_agent already resolved (never the "
+        "customer's original wording, and never a name you match or guess yourself — "
+        "get_item_catalog is for displaying/verifying prices, not for re-matching an "
+        "item description). Searches quote history for similar past orders as "
         "reference, and calls quote_line_item (which applies bulk-discount pricing "
         "using the real catalog price) to get the authoritative price for each item. "
         "Returns a line-item price breakdown with a rationale for the price."
@@ -926,10 +934,13 @@ ordering_agent = ToolCallingAgent(
         "actual customer sale (a sales transaction, priced from the catalog and "
         "discount tiers) and must be called for every fulfilled line item. Can also "
         "pull the company's cash balance and financial report. IMPORTANT: only ever "
-        "call place_stock_order/finalize_sale with the exact item name you were told "
-        "to act on. If that item_name is rejected as not matching the catalog, report "
-        "it back as unmatched/unfulfillable — never substitute a different, unrelated "
-        "catalog item just to force a transaction through."
+        "call place_stock_order/finalize_sale with the exact canonical catalog "
+        "item_name that inventory_agent already resolved for this item — never the "
+        "customer's original wording, and never a name you match, simplify, or guess "
+        "yourself. If that exact item_name is rejected as not matching the catalog, "
+        "something upstream is wrong: report it back as unmatched/unfulfillable — "
+        "never substitute a different, unrelated catalog item just to force a "
+        "transaction through."
     ),
 )
 
@@ -950,29 +961,34 @@ ONLY valid dates for this task.
 
 For every incoming customer request:
 
-1. Ask inventory_agent to match each requested item to its exact catalog name
-   (via get_item_catalog) and check current stock as of the request date. If
-   a requested item has no confident, unambiguous match in the catalog (e.g. a
-   compound description like "A4 glossy paper" that isn't itself a catalog
-   entry), that item is UNMATCHED — treat it exactly like insufficient stock:
-   report it to the customer as unable to be fulfilled, stating the reason.
-   NEVER substitute a different, unrelated catalog item in its place.
-2. If stock is insufficient for an item, ask inventory_agent to estimate the
-   supplier delivery date for a restock (using the request date as the order
-   date), and only proceed with that item if the restock would arrive by the
-   customer's requested delivery date. Otherwise, that line item cannot be
-   fulfilled — do not restock or sell it.
-3. Ask quoting_agent to price every item that can be fulfilled via
-   quote_line_item (which computes the authoritative catalog + discount
-   price), referencing quote history for rationale only.
+1. Ask inventory_agent to resolve each requested item description to its
+   exact catalog item_name and check current stock as of the request date.
+   inventory_agent is the ONLY place item-name resolution happens — it will
+   answer with either "RESOLVED: <description> -> <canonical item_name>" or
+   "UNMATCHED: <description>" for each item. Record these canonical names
+   exactly as given. An UNMATCHED item is treated exactly like insufficient
+   stock: report it to the customer as unable to be fulfilled, stating the
+   reason. NEVER substitute a different, unrelated catalog item in its place,
+   and never re-derive or re-guess a canonical name yourself.
+2. If stock is insufficient for a resolved item, ask inventory_agent to
+   estimate the supplier delivery date for a restock (using the request date
+   as the order date), and only proceed with that item if the restock would
+   arrive by the customer's requested delivery date. Otherwise, that line
+   item cannot be fulfilled — do not restock or sell it.
+3. For every item resolved (not unmatched) in step 1, ask quoting_agent to
+   price it via quote_line_item using the EXACT canonical item_name from
+   step 1 (never the customer's original wording), referencing quote history
+   for rationale only.
 4. Ask ordering_agent to check the cash balance, place a stock_orders
    restock via place_stock_order for any item identified as insufficient in
    step 2, and then — for every single item you have decided to fulfill,
-   restocked or not — call finalize_sale to record the customer's sale. A
-   restock alone never fulfills a customer order; only finalize_sale does.
-   Use the request date for every transaction. Only ever act on items that
-   were actually matched and requested — never ask ordering_agent to sell an
-   item that was not part of this customer's request, and never let it pick a
+   restocked or not — call finalize_sale to record the customer's sale. Pass
+   ordering_agent the SAME canonical item_name from step 1 for every call —
+   it must match exactly what quoting_agent was given, so the price quoted
+   to the customer is for the same item that gets charged. A restock alone
+   never fulfills a customer order; only finalize_sale does. Use the request
+   date for every transaction. Never ask ordering_agent to sell an item that
+   was not part of this customer's request, and never let it pick a
    substitute item if a tool call fails to match the catalog.
 5. Compose a final, customer-facing response in plain text that:
    - States clearly what was fulfilled and what was not, and why (e.g.
