@@ -3,131 +3,94 @@ Munder Difflin Multi-Agent System — Design Notes
 
 Architecture
 
-I built this with smolagents, using 4 agents total: one orchestrator and
-three workers. The workflow diagram (workflow_diagram.svg) shows the same
-layout, so I'll just explain the reasoning here instead of repeating it.
+Built with smolagents: one orchestrator plus three workers, matching the
+workflow diagram (workflow_diagram.svg).
 
-The orchestrator is the only agent that ever talks to the "customer." It
-doesn't have any tools of its own — its whole job is to take the incoming
-request, hand pieces of it off to the right worker, and stitch the results
-into one reply. I went with this instead of, say, giving the orchestrator
-its own tools too, because I wanted a clean separation: the orchestrator
-makes decisions and writes the final message, the workers touch the
-database.
+The orchestrator is the only agent that talks to the "customer." It has no
+tools of its own; it just delegates to the right worker and writes the
+final reply. The three workers map onto the three things the project asks
+for. inventory_agent checks stock and delivery timing, using
+get_stock_level, get_all_inventory, and get_supplier_delivery_date.
+quoting_agent prices items through quote_line_item (real catalog price
+plus a bulk discount: 5% at 100+, 10% at 500+, 15% at 1000+), using
+search_quote_history for rationale. ordering_agent is the only one that
+can spend money or record a sale, using get_cash_balance,
+generate_financial_report, and create_transaction.
 
-For the workers, I mapped them straight onto the three things the project
-asks for:
-
-- inventory_agent checks stock and delivery timing. It wraps
-  get_stock_level, get_all_inventory, and get_supplier_delivery_date.
-- quoting_agent prices things. It wraps search_quote_history (mostly for
-  rationale/context) and does the actual pricing through quote_line_item,
-  which looks up the real catalog price and applies a bulk discount
-  (5% at 100+, 10% at 500+, 15% at 1000+).
-- ordering_agent is the only one allowed to spend money or record a sale.
-  It wraps get_cash_balance, generate_financial_report, and
-  create_transaction (for both stock orders and sales).
-
-One decision I made early on: pricing is computed in code, not by the LLM.
-quote_line_item and finalize_sale both calculate the price from the real
-catalog unit price, so the number quoted to a customer is guaranteed to be
-the number actually charged — I didn't want to trust the model to do
-arithmetic correctly every time, and as it turned out, that was the right
-call (more on that below).
+Pricing is computed in code rather than by the LLM, so the number quoted
+to a customer is guaranteed to match the number charged. I didn't want to
+trust the model to do that arithmetic correctly every time, and that
+turned out to matter (see Limitations).
 
 Evaluation
 
-I ran all 20 requests from quote_requests_sample.csv through the system,
-tracking cash and inventory before and after each one. The run started at
-$45,059.70 cash / $4,940.30 inventory and ended at $45,334.63 / $4,568.75,
-with no negative stock anywhere.
+Ran all 20 requests from quote_requests_sample.csv, tracking cash and
+inventory before/after each. Cash went from $45,059.70 to $45,334.63,
+inventory from $4,940.30 to $4,568.75, with no negative stock anywhere.
 
-Looking at the actual ledger rather than just reading the response text:
-cash balance changed on 5 of the 20 requests, and those 5 all have a real
-transaction behind them. 15 of the 20 responses give a clear reason why
-something couldn't be fulfilled — out of stock, not in the catalog, or
-insufficient quantity for the requested delivery date. So the system is
-doing what it's supposed to: approving some things, rejecting others, and
-explaining why.
+Going by the ledger rather than the response text: cash balance changed
+on 5 of 20 requests, all backed by a real transaction, and 15 of 20
+responses give a clear reason for what couldn't be fulfilled (out of
+stock, not in catalog, insufficient quantity for the delivery date).
 
-What works well: when an item genuinely doesn't exist or is out of stock,
-the system says so plainly and usually cites the real number ("only 94
-sheets available"). Request 9 is a good example of everything working end
-to end — it declines two items with accurate reasons and correctly sells
-the third one, and the price it charges matches the cash change in the
-ledger exactly.
+It generally does the right thing: declining unavailable items with the
+real stock number cited, not just a generic refusal. Request 9 is a clean
+example end to end — two accurate declines and one correct sale that
+matches the ledger exactly.
 
 Limitations
 
-The pattern I kept running into: anything I could enforce in code holds up
-every time — item name resolution, the discount math, the check that
-blocks a sale from exceeding real stock. Anything that instead depends on
-the model accurately reporting what it did doesn't hold up consistently.
-A few things worth calling out specifically, based on this run's
-test_results.csv:
+Anything enforceable in code holds up every time: item name resolution,
+discount math, the check that blocks a sale from exceeding real stock.
+Anything that depends on the model accurately reporting its own actions
+does not hold up consistently. From this run's test_results.csv:
 
-- A couple of responses claim an item was "fulfilled" with no matching
-  transaction in the ledger at all (requests 16 and 17). There's a rule
-  requiring the orchestrator to only say "fulfilled" if ordering_agent
-  actually returned a transaction ID, but that rule still depends on the
-  model reporting honestly about its own actions, so it isn't airtight.
-- A few responses state dollar amounts that don't match what actually
-  happened. Request 1 talks about $9.75 in sales but cash only moved by
-  $0.50. Request 8 lists $540.50 across four items but cash only went up
-  $128.90. Request 13 is the reverse case — cash went up $104 with nothing
-  disclosed to the customer at all.
-- A few responses mention things they shouldn't — cash balance (requests 1
-  and 7) or an internal transaction ID (requests 8 and 9) — despite being
-  explicitly instructed never to reveal either to a customer.
-- Item matching is exact (aside from case and whitespace), so a compound
-  description like "A4 glossy paper" won't match anything, even though the
-  catalog has "A4 paper" and "Glossy paper" as separate items. The system
-  correctly declines rather than guessing at a substitute, but that also
-  means it under-fulfills requests a human would probably read as
-  reasonable.
+Requests 16 and 17 claim an item was "fulfilled" with no matching
+transaction in the ledger. A rule requires the orchestrator to only say
+"fulfilled" when ordering_agent returns a transaction ID, which helps but
+still depends on the model reporting honestly.
 
-During development I also found and fixed a few more serious issues along
-the way — a step timeout that caused the same sale to get recorded twice,
-sales going through with no stock check (which pushed some items into
-negative inventory), and the ordering agent selling a completely unrelated
-item when it couldn't find a match for what was actually requested. None
-of those show up in this run, but they're the reason the stock check and
-the single-resolver rule mentioned above exist at all.
+Requests 1, 8, and 13 state dollar amounts that don't match the actual
+cash movement (e.g. request 8 claims $540.50 sold while cash only rose
+$128.90; request 13 shows a $104 cash increase never mentioned to the
+customer).
 
-Overall, I don't think the remaining issues are fixable by further tweaking
-the wording of instructions. They come from relying on a small model
-(gpt-4o-mini) to self-report accurately on its own actions instead of
-having every claim independently verified — that's a limitation of the
-approach, not of any one prompt.
+Requests 1, 7, 8, and 9 mention cash balance or an internal transaction ID
+to the customer, despite being told never to.
+
+Item matching is exact aside from case/whitespace, so a compound
+description like "A4 glossy paper" won't match, even though "A4 paper"
+and "Glossy paper" exist separately. It correctly declines rather than
+guessing, but that also means it under-fulfills requests a human reader
+would probably consider reasonable.
+
+Earlier in development I also hit and fixed more serious issues: a step
+timeout that recorded the same sale twice, sales going through with no
+stock check (pushing some items negative), and the ordering agent selling
+an unrelated item when it couldn't find a match. None of that shows up in
+this run; they're why the stock check and single-resolver rule exist.
+
+None of this seems fixable by further tweaking instructions. It comes from
+relying on a small model (gpt-4o-mini) to self-report accurately rather
+than having every claim independently verified.
 
 Suggestions for improvement
 
-1. Reconcile the response against the ledger before sending it. The
-   cleanest fix for the two issues above would be code, not prompting: add
-   the transaction totals ordering_agent actually returned, compare that
-   number to whatever the orchestrator writes in the customer message, and
-   regenerate the response if they don't match.
+1. Reconcile the response against the ledger before sending it: sum what
+   ordering_agent actually returned, compare it to what the orchestrator
+   writes, and regenerate if they don't match.
 
-2. Better item matching. Right now matching is exact (aside from case and
-   whitespace), which is why compound descriptions like "A4 glossy paper"
-   trip it up. Some kind of fuzzy or similarity-based matching against the
-   catalog would handle these more gracefully than an outright miss.
+2. Fuzzy item matching instead of exact match, so compound descriptions
+   resolve to the closest real SKU instead of failing outright.
 
-3. Make transactions idempotent. Give create_transaction an idempotency
-   key so a retried step (from a timeout, or the agent just calling a tool
-   twice) can never record the same sale twice.
+3. Make create_transaction idempotent so a retried step can't record the
+   same sale twice.
 
-4. Strip internal details before the response goes out. A simple filter
-   that removes any mention of cash balance or transaction IDs from the
-   final text would catch the leaks that still happen occasionally,
-   without relying on the model to remember not to include them.
+4. Strip cash balance and transaction ID mentions from the final response
+   with a simple filter, instead of relying on the model to remember not
+   to include them.
 
-5. Try a stronger model. I thought about whether this is worth suggesting,
-   and I think it genuinely is — pretty much every remaining issue here
-   (wrong dates, claiming something happened when it didn't, made-up
-   rationale) is the model not following instructions carefully, not a
-   flaw in the logic. gpt-4o-mini is cheap and fast, which is why I used
-   it, but a stronger model would likely make fewer of these mistakes. It
-   costs more per request, so it's a real tradeoff, not a free win — but
-   given how much of this report is about instruction-following failures,
-   it's probably the single highest-leverage change on this list.
+5. Use a stronger model. Nearly every remaining issue here is the model
+   not following instructions rather than a logic flaw, so this is
+   probably the single highest-leverage change, at the cost of more
+   expensive requests.
