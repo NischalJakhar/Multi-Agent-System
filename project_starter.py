@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import os
+import re
 import time
 import dotenv
 import ast
@@ -1027,6 +1028,42 @@ orchestrator_agent = CodeAgent(
 )
 
 
+_REST_OF_CLAUSE = r'(?:\d\.\d|[^,.\n])*'  # consumes normal text and $-amount decimals, stops at a real clause boundary
+
+SENSITIVE_PATTERNS = [
+    r'Transaction ID:\s*\d+',
+    r'transaction_id\s*[:=]\s*\d+',
+    r'transaction ID\s*[:=]?\s*\d+',
+    r'cash balance' + _REST_OF_CLAUSE,
+    r'cash constraints' + _REST_OF_CLAUSE,
+    r'cash reserves' + _REST_OF_CLAUSE,
+    r'internal database' + _REST_OF_CLAUSE,
+    r'financial situation' + _REST_OF_CLAUSE,
+]
+
+
+def sanitize_customer_response(text: str) -> str:
+    """
+    Deterministically strip internal details (cash balance, transaction IDs,
+    other internal system language) from a customer-facing response.
+
+    This is a code-level backstop: the orchestrator is instructed never to
+    reveal this information, but an LLM can't be relied on to follow that
+    instruction every time, so this regex pass catches what slips through.
+
+    Args:
+        text: The raw customer-facing response text.
+
+    Returns:
+        The response with any sensitive internal phrases replaced by a
+        neutral placeholder.
+    """
+    cleaned = text
+    for pattern in SENSITIVE_PATTERNS:
+        cleaned = re.sub(pattern, 'internal processing details', cleaned, flags=re.IGNORECASE)
+    return cleaned.replace('internal processing details were resolved promptly, ', '')
+
+
 def call_your_multi_agent_system(request_text: str) -> str:
     """
     Entry point that runs a single customer request through the multi-agent system.
@@ -1035,10 +1072,11 @@ def call_your_multi_agent_system(request_text: str) -> str:
         request_text: The customer's request, including the request date.
 
     Returns:
-        The orchestrator's final, customer-facing text response.
+        The orchestrator's final, customer-facing text response, with any
+        internal details stripped out.
     """
     result = orchestrator_agent.run(request_text)
-    return str(result)
+    return sanitize_customer_response(str(result))
 
 
 # Run your test scenarios by writing them here. Make sure to keep track of them.
