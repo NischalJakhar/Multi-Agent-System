@@ -25,18 +25,19 @@ turned out to matter (see Limitations).
 Evaluation
 
 Ran all 20 requests from quote_requests_sample.csv, tracking cash and
-inventory before/after each. Cash went from $45,059.70 to $45,334.63,
-inventory from $4,940.30 to $4,568.75, with no negative stock anywhere.
+inventory before/after each. Cash went from $45,056.45 to $45,386.05,
+inventory from $4,940.30 to $4,422.70, with no negative stock anywhere.
 
 Going by the ledger rather than the response text: cash balance changed
-on 5 of 20 requests, all backed by a real transaction, and 15 of 20
-responses give a clear reason for what couldn't be fulfilled (out of
-stock, not in catalog, insufficient quantity for the delivery date).
+on 10 of 20 requests, all backed by a real transaction, and every request
+that declines an item states a reason (out of stock, not in catalog,
+insufficient quantity for the delivery date, or a restock arriving too
+late).
 
 It generally does the right thing: declining unavailable items with the
-real stock number cited, not just a generic refusal. Request 9 is a clean
-example end to end — two accurate declines and one correct sale that
-matches the ledger exactly.
+real stock number cited, not just a generic refusal. Requests 5, 6, and 15
+are clean examples — the dollar amount in the response matches the real
+cash change exactly.
 
 Limitations
 
@@ -45,18 +46,31 @@ discount math, the check that blocks a sale from exceeding real stock.
 Anything that depends on the model accurately reporting its own actions
 does not hold up consistently. From this run's test_results.csv:
 
-Requests 16 and 17 claim an item was "fulfilled" with no matching
-transaction in the ledger. A rule requires the orchestrator to only say
-"fulfilled" when ordering_agent returns a transaction ID, which helps but
-still depends on the model reporting honestly.
+Request 1 claims three items were "fulfilled" for $61.75, but cash didn't
+move at all. Request 17 has the same problem, claiming $130 in fulfilled
+items with no matching transaction. A rule requires the orchestrator to
+only say "fulfilled" when ordering_agent returns a transaction ID, which
+helps but still depends on the model reporting honestly about whether
+that actually happened.
 
-Requests 1, 8, and 13 state dollar amounts that don't match the actual
-cash movement (e.g. request 8 claims $540.50 sold while cash only rose
-$128.90; request 13 shows a $104 cash increase never mentioned to the
-customer).
+Several other requests state dollar amounts that don't match the real
+cash movement even when a transaction did happen — request 14 claims
+$705 in fulfilled sales while cash only dropped $31.50, and request 10
+claims a $90 sale while cash dropped $278.45. Whatever caused the real
+cash movement (probably a stock order) isn't reflected in what the
+customer is told.
 
-Requests 1, 7, 8, and 9 mention cash balance or an internal transaction ID
-to the customer, despite being told never to.
+Request 4 is a different kind of failure: the response isn't addressed to
+the customer at all ("The inquiry... has been sent to the customer.
+Awaiting their response.") — it reads like an internal status note that
+leaked into the customer-facing field instead of an actual answer.
+
+I added a code-level filter that strips cash balance and transaction ID
+mentions before a response is returned, since the model doesn't reliably
+follow the "never mention this" instruction on its own. It's working (no
+raw leaks in this run), though the replacement text ("internal processing
+details") occasionally makes a sentence read a little awkwardly rather
+than smoothly.
 
 Item matching is exact aside from case/whitespace, so a compound
 description like "A4 glossy paper" won't match, even though "A4 paper"
@@ -86,9 +100,10 @@ Suggestions for improvement
 3. Make create_transaction idempotent so a retried step can't record the
    same sale twice.
 
-4. Strip cash balance and transaction ID mentions from the final response
-   with a simple filter, instead of relying on the model to remember not
-   to include them.
+4. Smooth over the sanitization filter so redacted text reads naturally
+   instead of dropping in a generic placeholder phrase, and add a check
+   that catches responses like request 4's, which aren't addressed to the
+   customer at all.
 
 5. Use a stronger model. Nearly every remaining issue here is the model
    not following instructions rather than a logic flaw, so this is
