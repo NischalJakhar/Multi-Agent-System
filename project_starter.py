@@ -979,19 +979,28 @@ For every incoming customer request:
    price it via quote_line_item using the EXACT canonical item_name from
    step 1 (never the customer's original wording), referencing quote history
    for rationale only.
-4. Ask ordering_agent to check the cash balance, place a stock_orders
-   restock via place_stock_order for any item identified as insufficient in
-   step 2, and then — for every single item you have decided to fulfill,
-   restocked or not — call finalize_sale to record the customer's sale. Pass
+4. For every single item you have decided to fulfill (in stock, or
+   sufficiently restocked per step 2), you MUST ask ordering_agent to check
+   the cash balance, place a stock_orders restock via place_stock_order if
+   needed, and then call finalize_sale to record the customer's sale. Pass
    ordering_agent the SAME canonical item_name from step 1 for every call —
    it must match exactly what quoting_agent was given, so the price quoted
    to the customer is for the same item that gets charged. A restock alone
    never fulfills a customer order; only finalize_sale does. Use the request
    date for every transaction. Never ask ordering_agent to sell an item that
    was not part of this customer's request, and never let it pick a
-   substitute item if a tool call fails to match the catalog.
-5. Compose a final, customer-facing response in plain text that:
-   - States clearly what was fulfilled and what was not, and why (e.g.
+   substitute item if a tool call fails to match the catalog. Pricing an
+   item with quote_line_item is NOT the same as fulfilling it — quoting
+   alone never completes an order.
+5. Compose a final, customer-facing response in plain text. Before writing
+   it, verify for yourself that step 4 actually happened: you may state an
+   item is "fulfilled"/"sold" ONLY if ordering_agent's response for that
+   exact item, in this run, included a transaction_id from finalize_sale. If
+   you skipped step 4 for an item (e.g. you only quoted it, or you are
+   unsure whether finalize_sale ran), you MUST treat it as NOT fulfilled and
+   say so — never state or imply a sale happened without a transaction_id to
+   back it up. The response must:
+   - State clearly what was fulfilled and what was not, and why (e.g.
      insufficient stock, cannot meet the requested delivery date).
    - Shows the price for each fulfilled item, including any discount applied,
      with a short rationale.

@@ -47,33 +47,37 @@ Decisions behind this split:
 2. Evaluation (test_results.csv)
 ----------------------------------
 All 20 requests in quote_requests_sample.csv were run in chronological order,
-tracking cash and inventory value before/after each. This is the third full
-run; the first two surfaced bugs (below) that were fixed in between. Starting
-point (as of 2025-04-01, after seed stock purchases): cash $45,059.70,
-inventory $4,940.30. Ending point (2025-04-17): cash $39,301.60, inventory
-$9,780.65 (both sane and positive).
+tracking cash and inventory value before/after each. This is the fourth full
+run (the first three surfaced bugs, below, that were fixed in between).
+Starting point (as of 2025-04-01, after seed stock purchases): cash
+$45,059.70, inventory $4,940.30. Ending point (2025-04-17): cash $45,535.68,
+inventory $4,423.20 (both sane and positive — no negative stock anywhere).
 
-Against the rubric's evaluation criteria:
-- Cash balance changed on 7 of the 20 requests (>= the 3 required).
-- 16 of the 20 responses contain at least one successfully priced/fulfilled
-  line item (>= the 3 required).
-- 16 of the 20 responses explicitly state a reason for a line item that
-  could not be fulfilled (out of stock, no catalog match), confirming not
-  every request is blindly approved.
+Against the rubric's evaluation criteria, going strictly by the transaction
+ledger (not the response text — see finding (f) below for why that
+distinction matters here):
+- Cash balance changed on 3 of the 20 requests (requests 4, 6, 7 — meets,
+  but does not comfortably clear, the 3-required minimum).
+- Those same 3 requests are the only ones with a real, ledger-backed sale
+  (>= the 3 required, but only just).
+- 17 of the 20 responses explicitly state a reason for a line item that
+  could not be fulfilled (out of stock, no catalog match, insufficient
+  stock for the requested delivery date), confirming not every request is
+  approved.
 
 Strengths observed:
 - The system correctly and clearly declines items that are genuinely out of
-  stock or don't exist in the catalog, and says why, in plain language, in
-  most requests (e.g. "all requested items are out of stock").
+  stock or don't exist in the catalog, and says why, in plain language,
+  often citing the real stock number (e.g. "only 122 sheets available").
 - Deterministic pricing means every quoted discount is arithmetically
   correct and reproducible, independent of the LLM's own (sometimes
   garbled) restatement of the numbers.
-- Bulk orders are split across multiple line items and priced/fulfilled
-  independently, so a request with 3-4 items can be partially fulfilled
-  rather than all-or-nothing.
 - No negative stock and no sales of items unrelated to the actual request
   anywhere in this run's ledger (see (b) and (c) below — both confirmed
   fixed by this run).
+- No quote/charge mismatches: unlike an earlier run, quoting_agent and
+  ordering_agent no longer independently guess different substitute items
+  for the same ambiguous request (see (c2) below — confirmed fixed).
 
 Limitations found by auditing the transaction ledger against the raw request
 text (not just the chat transcript — this is the main lesson from this
@@ -110,23 +114,74 @@ c) Item-name substitution on ambiguous requests (run 1 & 2). Name
    Confirmed fixed: every sold item in this run traces back to an actual
    request.
 
-d) Partial-batch retries duplicate already-completed sales (still present
-   in this run). When one request lists several items and some of them
-   fail to match the catalog (e.g. a request for "A4 paper", "A3 paper",
-   and "500 reams of printer paper" — the catalog has no "A3 paper" or
-   "printer paper" entries), the ordering_agent retries the whole batch
-   instead of just the failed items, re-selling the items that already
-   succeeded (e.g. "A4 paper" was sold 3 times over for that one request).
-   This doesn't corrupt correctness the way (b) and (c) did — no negative
-   stock, no unrelated items — but it does inflate cash/inventory movement
-   for a handful of items. Not yet fixed; see suggestion #2 below.
+c2) Quote/charge mismatch from independent re-guessing (run 3). Even after
+   (c) was fixed, quoting_agent and ordering_agent were each independently
+   free to interpret an ambiguous item description, and could land on two
+   different catalog items for the same request: in one case quoting_agent
+   quoted "A4 glossy paper" as "Glossy paper" ($38.00) while ordering_agent
+   separately charged it as "A4 paper" ($9.50) — the customer was quoted
+   one price and actually charged a different one, for a different item.
+   Fixed by making inventory_agent the sole item-name resolver: it now
+   states each item as "RESOLVED: <description> -> <canonical item_name>"
+   or "UNMATCHED: <description>", and the orchestrator is instructed to
+   pass that exact canonical name to both quoting_agent and ordering_agent
+   rather than letting them each re-interpret the customer's wording.
+   Confirmed fixed in this run: no quote/charge mismatches found.
 
-e) Rationale isn't always faithful to the actual system state (observed in
-   an earlier run). The system once told a customer an item couldn't be
-   processed due to "insufficient cash balance" when the real cash balance
-   was healthy (~$45,000) — the LLM invented a plausible-sounding but false
-   reason. Not code-fixable without validating output against tool results
-   (see suggestion #3 below).
+d) Partial-batch retries duplicate already-completed sales (minor, still
+   present). When one request lists several items and some of them fail to
+   match the catalog, the ordering_agent can retry a whole batch instead of
+   just the failed items, re-selling an item that already succeeded. This
+   run showed a much smaller instance of it (a duplicated 1-unit, $0.20
+   restock) than earlier runs (previously a 10,000-unit sale duplicated 3x).
+   Not yet fixed; see suggestion #2 below.
+
+e) Rationale isn't always faithful to the actual system state. The system
+   has, across runs, invented plausible-sounding but false reasons not
+   backed by any tool call — e.g. declining an order citing "insufficient
+   cash balance" when the real balance was healthy. Root cause traced (see
+   (f)) to ordering_agent occasionally using a hallucinated date (e.g.
+   "2023-10-03" instead of the real request date) for check_cash_balance,
+   producing a false $0.00 reading — and then stating that internal cash
+   figure to the customer, despite explicit instructions never to reveal
+   cash balance externally. Not fully code-fixable: date parameters are
+   legitimately dynamic per request, so there's no catalog-style ground
+   truth to validate them against the way item names can be (see
+   suggestion #3).
+
+f) Fabricated "fulfilled" claims with zero backing transaction (found in
+   this run, fixed after it completed). In 5 of the 20 requests (1, 3, 5,
+   16, 17), the orchestrator's customer-facing text stated specific items
+   were "Fulfilled" at a stated price — but ordering_agent was never even
+   invoked for that request, so no finalize_sale transaction exists in the
+   ledger at all (cash_balance/inventory_value are unchanged from baseline
+   for those rows in test_results.csv). This is more serious than (c2):
+   it's not a wrong-item charge, it's a complete fabrication of a
+   successful transaction. Root cause: the orchestrator, once it had a
+   price from quoting_agent, sometimes composed a "success" response
+   without ever completing step 4 (delegating to ordering_agent). Fixed
+   after this run by requiring the orchestrator to only state an item is
+   fulfilled if ordering_agent's response for that exact item, in that run,
+   included a real transaction_id — otherwise it must report the item as
+   not fulfilled. Smoke-tested (not re-validated at full scale): the exact
+   scenario from request 1 above now correctly reports non-fulfillment
+   instead of fabricating success — though that same smoke test is what
+   surfaced the cash-balance date hallucination described in (e). Per a
+   deliberate choice not to spend another full ~30-minute run chasing
+   further hallucinations, this fix is included in project_starter.py but
+   test_results.csv above still reflects the pre-fix (fabricating) behavior
+   for requests 1, 3, 5, 16, and 17 — treat those five rows' "fulfilled"
+   claims as unreliable; the other 15 rows are consistent with the ledger.
+
+Overall assessment: guardrails that are enforceable in code (catalog name
+resolution, price computation, stock checks, the transaction-id-required
+rule) have all been verified to hold. Guardrails that depend entirely on
+the LLM (gpt-4o-mini here) correctly following a written instruction —
+using the right date, not inventing a rationale, always completing a
+multi-step delegation — were reduced in severity across four rounds of
+fixes, but not eliminated, and probably can't be through prompting alone.
+That's a property of using a smaller model as the decision layer, not a
+bug in any single instruction.
 
 3. Suggestions for further improvement
 -----------------------------------------
@@ -150,4 +205,11 @@ e) Rationale isn't always faithful to the actual system state (observed in
    that confirms every claim in the final response (price, reason for
    non-fulfillment, delivery date) is actually backed by a tool result from
    this run, to catch cases like the invented "insufficient cash balance"
-   rationale before it reaches the customer.
+   rationale, or the fabricated-fulfillment cases in finding (f), before
+   they reach the customer.
+
+4. Use a stronger model for the orchestrator. Several remaining issues
+   (date hallucination, skipping a delegation step while still claiming
+   success) are instruction-following failures rather than logic bugs.
+   Swapping MODEL_ID from gpt-4o-mini to a stronger model would likely
+   reduce their frequency, at higher per-request cost.
