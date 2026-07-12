@@ -9,7 +9,7 @@
   </defs>
 
   <rect x="0" y="0" width="1340" height="720" fill="#ffffff"/>
-  <text x="670" y="24" text-anchor="middle" font-size="20" font-weight="700" fill="#111111">Munder Difflin Multi-Agent System — Workflow Diagram</text>
+  <text x="670" y="24" text-anchor="middle" font-size="20" font-weight="700" fill="#111111">Paper Supply Multi-Agent System — Workflow Diagram</text>
 
   <!-- Customer Request -->
   <rect x="30" y="45" width="280" height="60" rx="8" fill="#eef4fb" stroke="#2f6fb3" stroke-width="1.5"/>
@@ -87,7 +87,7 @@
 
   <!-- Database -->
   <rect x="380" y="600" width="580" height="70" rx="10" fill="#f1f1f1" stroke="#555555" stroke-width="1.8"/>
-  <text x="670" y="624" text-anchor="middle" font-size="13" font-weight="700" fill="#222222">SQLite Database (munder_difflin.db)</text>
+  <text x="670" y="624" text-anchor="middle" font-size="13" font-weight="700" fill="#222222">SQLite Database</text>
   <text x="670" y="642" text-anchor="middle" font-size="10.5" fill="#222222">tables: transactions · inventory · quotes · quote_requests</text>
 
   <!-- tools -> db arrows -->
